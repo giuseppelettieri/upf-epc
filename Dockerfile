@@ -5,7 +5,7 @@
 # Stage bess-build: fetch BESS dependencies & pre-reqs
 FROM registry.aetherproject.org/sdcore/bess_build:latest AS bess-build
 ARG CPU=native
-ARG BESS_COMMIT=main
+ARG BESS_COMMIT=seb
 ENV PLUGINS_DIR=plugins
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install \
@@ -93,7 +93,7 @@ RUN apt-get update && apt-get install -y \
 
 # BESS pre-reqs
 WORKDIR /bess
-RUN git clone https://github.com/omec-project/bess.git . && \
+RUN git clone https://github.com/giuseppelettieri/bess.git . && \
     git checkout ${BESS_COMMIT} && \
     cp -a protobuf /protobuf
 
