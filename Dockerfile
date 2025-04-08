@@ -159,7 +159,7 @@ RUN apt-get update && \
         automake cmake libtool \
         make ninja-build patch python3-pip \
         unzip virtualenv zip tar meson \
-        libelf-dev libz-dev libnl-3-dev
+        libelf-dev libz-dev libnl-3-dev clang llvm
 
 ## Mellanox OFED Driver
 ARG ENABLE_MLX
