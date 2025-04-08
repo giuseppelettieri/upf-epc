@@ -164,7 +164,7 @@ class AppMbrTest(TrexTest, GrpcTest):
         )
 
         trex_stats = self.trex_client.get_stats()
-        return get_flow_stats(0, trex_stats)
+        return get_flow_stats(BESS_CORE_PORT, trex_stats)
 
 
 class DlAppMbrConformingTest(AppMbrTest):

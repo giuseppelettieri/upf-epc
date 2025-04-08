@@ -140,6 +140,9 @@ for idx, iface in enumerate(interfaces):
     p.workers = [i for i in range(len(workers))]
     p.init_port(idx, parser.mode)
 
+    #if parser.enable_ebpf_fp:
+    #    p.configure_rx_queues()
+
     # setup port module with auxiliary modules
     if parser.mode == 'sim':
         p.setup_port(parser.ip_frag_with_eth_mtu, parser.max_ip_defrag_flows, parser.measure_upf, packet_generator[iface], **seq_kwargs[iface])

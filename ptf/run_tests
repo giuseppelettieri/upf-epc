@@ -8,9 +8,10 @@ set -eux -o pipefail
 TEST_DIR="$(pwd)"
 
 # Read in parameters following style: https://google.github.io/styleguide/shellguide.html#case-statement
-while getopts 't:' flag; do
+while getopts 't:s' flag; do
 	case "${flag}" in
 	t) testdir="${OPTARG}" ;;
+	s) NO_TREX=1 ;;
 	*) error "Unexpected option ${flag}" ;;
 	esac
 done
@@ -25,6 +26,13 @@ echo "*** Starting tests in container (${runName})..."
 # Do not attach stdin if running in an environment without it (e.g. Jenkins)
 it=$(test -t 0 && echo "-it" || echo "-t")
 
+if [ -z ${NO_TREX+x} ]; then
+  TREX="--trex-address ${TREX_ADDR}"
+else
+  TREX=''
+  testName="${4:-""}"
+fi
+
 # run PTF command from script in test container with all necessary dependencies
 docker run --name "${runName}" "${it}" \
 	--privileged \
@@ -34,9 +42,9 @@ docker run --name "${runName}" "${it}" \
 	python3 -u /upf-tests/lib/ptf_runner.py \
 	--ptf-dir /upf-tests/"${testdir}" \
 	${TREX_PARAMS:-} \
-	--trex-address "${TREX_ADDR}" \
+	${TREX} \
 	--bess-address "${UPF_ADDR}" \
-	--trex-config /upf-tests/config/trex-cfg-for-ptf.yaml \
+	--trex-config /upf-tests/config/trex_cfg.yaml \
 	--xunit \
 	--xunit-dir /tmp/ptf-logs \
 	${testName}

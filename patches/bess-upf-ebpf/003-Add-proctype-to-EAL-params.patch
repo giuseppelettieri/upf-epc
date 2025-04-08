@@ -1,0 +1,13 @@
+diff --git a/core/dpdk.cc b/core/dpdk.cc
+index 964d513c..e19c3c16 100644
+--- a/core/dpdk.cc
++++ b/core/dpdk.cc
+@@ -121,6 +121,8 @@ void init_eal(int dpdk_mb_per_socket, std::string nonworker_corelist) {
+       "--no-shconf",
+       // TODO(sangjin) switch to dynamic memory mode
+       "--legacy-mem",
++      "--proc-type",
++      "auto",
+   };
+ 
+   if (FLAGS_iova != "")

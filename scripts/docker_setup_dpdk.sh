@@ -18,50 +18,49 @@ pfcp_port=8805
 # "af_xdp" uses AF_XDP sockets via DPDK's vdev for pkt I/O. This version is non-zc version. ZC version still needs to be evaluated.
 # "af_packet" uses AF_PACKET sockets via DPDK's vdev for pkt I/O.
 # "sim" uses Source() modules to simulate traffic generation
-# "cndp" uses kernel AF-XDP. It supports ZC and XDP offload if driver and NIC supports it. It's tested on Intel 800 series n/w adapter.
-# mode="dpdk"
-#mode="cndp"
-#mode="af_xdp"
+# "af_xdp" uses a combination of AF_XDP mode and eBPF/XDP fast-path
+mode="dpdk"
+# mode="af_xdp_ebpf"
 #mode="af_packet"
 # mode="sim"
-mode="xdp"
+# mode="xdp"
 # mode="af_xdp_ebpf"
 ebpf_cores=1
 
 # Gateway interface(s)
 #
-# In the order of ("s1u/n3" "sgi/n6")
-ifaces=("ens803f2" "ens803f3")
+# In the order of ("s1u" "sgi")
+ifaces=("access" "core")
 
 # Static IP addresses of gateway interface(s) in cidr format
 #
-# In the order of (s1u/n3 sgi/n6)
+# In the order of (s1u sgi)
 ipaddrs=(198.18.0.1/30 198.19.0.1/30)
 
 # MAC addresses of gateway interface(s)
 #
-# In the order of (s1u/n3 sgi/n6)
-macaddrs=(9e:b2:d3:34:ab:27 c2:9c:55:d4:8a:f6)
+# In the order of (s1u sgi)
+macaddrs=(f8:f2:1e:b2:43:00 f8:f2:1e:b2:43:01)
 
 # Static IP addresses of the neighbors of gateway interface(s)
 #
-# In the order of (n-s1u/n3 n-sgi/n6)
+# In the order of (n-s1u n-sgi)
 nhipaddrs=(198.18.0.2 198.19.0.2)
 
 # Static MAC addresses of the neighbors of gateway interface(s)
 #
-# In the order of (n-s1u/n3 n-sgi/n6)
-nhmacaddrs=(22:53:7a:15:58:50 22:53:7a:15:58:50)
+# In the order of (n-s1u n-sgi)
+nhmacaddrs=(f8:f2:1e:b2:65:70 f8:f2:1e:b2:65:71)
 
 # IPv4 route table entries in cidr format per port
 #
-# In the order of ("{r-s1u/n3}" "{r-sgi/n6}")
+# In the order of ("{r-s1u}" "{r-sgi}")
 routes=("11.1.1.128/25" "0.0.0.0/0")
 
 num_ifaces=${#ifaces[@]}
 num_ipaddrs=${#ipaddrs[@]}
 
-# Set up static route and neighbor table entries of the SPGW/UPF
+# Set up static route and neighbor table entries of the SPGW
 function setup_trafficgen_routes() {
 	for ((i = 0; i < num_ipaddrs; i++)); do
 		sudo ip netns exec pause ip neighbor add "${nhipaddrs[$i]}" lladdr "${nhmacaddrs[$i]}" dev "${ifaces[$i % num_ifaces]}"
@@ -109,14 +108,6 @@ function move_ifaces() {
 			# sudo ip netns exec pause ethtool -u "${ifaces[$i]}"
 		fi
 		sudo ip netns exec pause ip link set "${ifaces[$i]}" up
-		if [ "$mode" == 'cndp' ]; then
-			# num queues
-			num_q=1
-			# start queue index
-			start_q_idx=22
-			# RSS using TC filter
-			setup_tc "${ifaces[$i]}" $num_q $start_q_idx
-		fi
 	done
 	setup_addrs
 }
@@ -137,51 +128,6 @@ function set_xdp_cores() {
 	done
 }
 
-# Setup TC
-# Note: This function is used only for cndp mode.
-# Parameters: $1 = interface, $2 = number of queues, $3 = start queue index
-function setup_tc() {
-	# Interface name
-	iface=$1
-	# Number of queues
-	num_q=$2
-	# Start queue index
-	sq_idx=$3
-	sudo ip netns exec pause ethtool --offload $iface hw-tc-offload on
-	# Create two traffic control groups for the two queue sets - set 0 and set 1.
-	# queue set 1 will be used for dataplane traffic.
-	# queue set 0 will handle rest of the traffic (eg: control plane traffic).
-	# for e.g., 22@0 means 22 queues starting from queue id 0.
-	# 4@22 mean 4 queues starting from queue id 22.
-	sudo ip netns exec pause tc qdisc add dev $iface root mqprio \
-		num_tc 2 map 0 1 queues $sq_idx@0 $num_q@$sq_idx hw 1 mode channel
-	sudo ip netns exec pause tc qdisc add dev $iface clsact
-}
-
-# Add TC rules for N3/N6/N9 access and core interface.
-# Note: This function is used only for cndp mode.
-# Parameters: $1 = access interface, $2 = core interface
-# Inner UE IP address range and GTPU port is hardcoded for now.
-# UE IP address should match the generated traffic pattern.
-function add_tc_rules() {
-	# Encapuslated traffic N3 on access interface.
-	# RSS GTPU filter (Note: hw_tc 1 has >1 queues which results in implict RSS)
-	sudo ip netns exec pause tc filter add dev $1 protocol ip ingress \
-		prio 1 flower src_ip 16.0.0.0/16 enc_dst_port 2152 skip_sw hw_tc 1
-	# List TC rules on access interface.
-	sudo ip netns exec pause tc filter show dev $1 ingress
-
-	# Encapsulated traffic N9 on core interface.
-	# RSS GTPU filter (Note: hw_tc 1 has >1 queues which results in implict RSS)
-	sudo ip netns exec pause tc filter add dev $2 protocol ip ingress \
-		prio 1 flower dst_ip 16.0.0.0/16 enc_dst_port 2152 skip_sw hw_tc 1
-	# un-encapsulated traffic N6 on core interface
-	sudo ip netns exec pause tc filter add dev $2 protocol ip ingress \
-		prio 1 flower dst_ip 16.0.0.0/16 skip_sw hw_tc 1
-	# List TC rules on core interface.
-	sudo ip netns exec pause tc filter show dev $2 ingress
-}
-
 # Stop previous instances of bess* before restarting
 docker stop pause bess bess-routectl bess-web bess-pfcpiface || true
 docker rm -f pause bess bess-routectl bess-web bess-pfcpiface || true
@@ -191,9 +137,9 @@ sudo rm -rf /var/run/netns/pause
 make docker-build
 
 if [ "$mode" == 'dpdk' ]; then
-	DEVICES=${DEVICES:-'--device=/dev/vfio/48 --device=/dev/vfio/49 --device=/dev/vfio/vfio'}
-	PRIVS='--cap-add IPC_LOCK'
-
+	# Devices for DUT machine
+	DEVICES=${DEVICES:-'--device=/dev/vfio/88 --device=/dev/vfio/89 --device=/dev/vfio/vfio'}
+	PRIVS='--privileged'
 elif [ "$mode" == 'af_xdp' ] || [ "$mode" == 'af_xdp_ebpf' ] || [ "$mode" == 'xdp' ] ; then
 	PRIVS='--privileged'
 elif [ "$mode" == 'af_packet' ]; then
@@ -221,10 +167,6 @@ case $mode in
 	# Make sure that kernel does not send back icmp dest unreachable msg(s)
 	sudo ip netns exec pause iptables -I OUTPUT -p icmp --icmp-type port-unreachable -j DROP
 	;;
-"cndp")
-	move_ifaces
-	add_tc_rules "${ifaces[0]}" "${ifaces[1]}"
-	;;
 *) ;;
 
 esac
@@ -232,13 +174,6 @@ esac
 # Setup trafficgen routes
 if [ "$mode" != 'sim' ]; then
 	setup_trafficgen_routes
-fi
-
-# Specify per-socket hugepages to allocate (in MBs) by bess daemon (default: 1024)
-HUGEPAGES=''
-# Use more hugepages for CNDP
-if [ "$mode" == 'cndp' ]; then
-	HUGEPAGES='-m 2048'
 fi
 
 # Run bessd
@@ -251,7 +186,7 @@ docker run --name bess -td --restart unless-stopped \
 	--net container:pause \
 	$PRIVS \
 	$DEVICES \
-	upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:$bessd_port $HUGEPAGES
+	upf-epc-bess:"$(<VERSION)" -grpc-url=0.0.0.0:$bessd_port
 
 docker logs bess
 
@@ -281,9 +216,9 @@ docker run --name bess-web -d --restart unless-stopped \
 # Run bess-pfcpiface depending on mode type
 docker run --name bess-pfcpiface -td --restart on-failure \
 	--net container:pause \
-	-v "$PWD/conf/upf.jsonc":/conf/upf.jsonc \
+	-v "$PWD/conf/upf.json":/conf/upf.json \
 	upf-epc-pfcpiface:"$(<VERSION)" \
-	-config /conf/upf.jsonc
+	-config /conf/upf.json
 
 # Don't run any other container if mode is "sim"
 if [ "$mode" == 'sim' ]; then

@@ -71,7 +71,7 @@ var intEnc = func(u uint64) *pb.FieldData {
 	return &pb.FieldData{Encoding: &pb.FieldData_ValueInt{ValueInt: u}}
 }
 
-var bessIP = flag.String("bess", "localhost:10514", "BESS IP/port combo")
+var bessIP = flag.String("bess", "0.0.0.0:10514", "BESS IP/port combo")
 
 var enableGtpuPathMonitoring = false
 
@@ -82,6 +82,7 @@ type bess struct {
 	notifyBessSocket net.Conn
 	endMarkerChan    chan []byte
 	qciQosMap        map[uint8]*QosConfigVal
+	eBPFFastPath     bool
 }
 
 func (b *bess) IsConnected(accessIP *net.IP) bool {
@@ -787,6 +788,8 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 	b.client = pb.NewBESSControlClient(b.conn)
 
+	b.eBPFFastPath = conf.EnableBPFFastPath
+
 	b.clearState()
 
 	if conf.EnableNotifyBess {
@@ -862,6 +865,27 @@ func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method upfMsgType
 	}
 }
 
+func (b *bess) processUPFeBPFPDR(ctx context.Context, any *anypb.Any, method upfMsgType) {
+	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
+		log.Println("Invalid method name: ", method)
+		return
+	}
+
+	methods := [...]string{"add_pdr", "add", "delete_pdr", "clear"}
+
+	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: "upfeBPF",
+		Cmd:  methods[method],
+		Arg:  any,
+	})
+
+	log.Traceln("upfeBPF resp : ", resp)
+
+	if err != nil || resp.GetError() != nil {
+		log.Errorf("upfeBPF method failed with resp: %v, err: %v\n", resp, err)
+	}
+}
+
 func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
 		var (
@@ -926,6 +950,51 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 			b.processPDR(ctx, any, upfMsgTypeAdd)
 		}
+
+		if b.eBPFFastPath {
+			log.Tracef("[eBPF Fast Path] PDR rules %+v", portRules)
+			for _, r := range portRules {
+				f := &pb.UPFeBPFCommandAddPDRArg{
+					Priority: int64(math.MaxUint32 - p.precedence),
+					Keys: &pb.PDRKeysData{
+						SrcIface:      uint64(p.srcIface),        /* src_iface-mask */
+						TunnelIP4Dst:  p.tunnelIP4Dst,            /* tunnel_ipv4_dst-mask */
+						TunnelTEID:    p.tunnelTEID,              /* enb_teid-mask */
+						UeIPsrcAddr:   p.appFilter.srcIP,         /* ueaddr ip-mask */
+						InetIPdstAddr: p.appFilter.dstIP,         /* inet ip-mask */
+						UeSrcPort:     uint32(r.srcPort),         /* ue port-mask */
+						InetSrcPort:   uint32(r.dstPort),         /* inet port-mask */
+						ProtoID:       uint32(p.appFilter.proto), /* proto id-mask */
+					},
+					Masks: &pb.PDRKeysData{
+						SrcIface:      uint64(p.srcIfaceMask),        /* src_iface-mask */
+						TunnelIP4Dst:  p.tunnelIP4DstMask,            /* tunnel_ipv4_dst-mask */
+						TunnelTEID:    p.tunnelTEIDMask,              /* enb_teid-mask */
+						UeIPsrcAddr:   p.appFilter.srcIPMask,         /* ueaddr ip-mask */
+						InetIPdstAddr: p.appFilter.dstIPMask,         /* inet ip-mask */
+						UeSrcPort:     uint32(r.srcMask),             /* ue port-mask */
+						InetSrcPort:   uint32(r.dstMask),             /* inet port-mask */
+						ProtoID:       uint32(p.appFilter.protoMask), /* proto id-mask */
+					},
+					Values: &pb.PDRValuesData{
+						PdrID: uint64(p.pdrID), /* pdr-id */
+						FseID: uint32(p.fseID), /* fseid */
+						CtrID: p.ctrID,         /* ctr_id */
+						QerID: qerID,           /* qer_id */
+						FarID: p.farID,         /* far_id */
+					},
+				}
+
+				any, err = anypb.New(f)
+				if err != nil {
+					log.Println("[eBPF PDR] Error marshalling the rule", f, err)
+					return
+				}
+
+				b.processUPFeBPFPDR(ctx, any, upfMsgTypeAdd)
+			}
+		}
+
 		done <- true
 	}()
 }
@@ -975,6 +1044,42 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			}
 
 			b.processPDR(ctx, any, upfMsgTypeDel)
+		}
+
+		if b.eBPFFastPath {
+			log.Tracef("[eBPF Fast Path] PDR rules %+v", portRules)
+			for _, r := range portRules {
+				f := &pb.UPFeBPFCommandDeletePDRArg{
+					Keys: &pb.PDRKeysData{
+						SrcIface:      uint64(p.srcIface),        /* src_iface-mask */
+						TunnelIP4Dst:  p.tunnelIP4Dst,            /* tunnel_ipv4_dst-mask */
+						TunnelTEID:    p.tunnelTEID,              /* enb_teid-mask */
+						UeIPsrcAddr:   p.appFilter.srcIP,         /* ueaddr ip-mask */
+						InetIPdstAddr: p.appFilter.dstIP,         /* inet ip-mask */
+						UeSrcPort:     uint32(r.srcPort),         /* ue port-mask */
+						InetSrcPort:   uint32(r.dstPort),         /* inet port-mask */
+						ProtoID:       uint32(p.appFilter.proto), /* proto id-mask */
+					},
+					Masks: &pb.PDRKeysData{
+						SrcIface:      uint64(p.srcIfaceMask),        /* src_iface-mask */
+						TunnelIP4Dst:  p.tunnelIP4DstMask,            /* tunnel_ipv4_dst-mask */
+						TunnelTEID:    p.tunnelTEIDMask,              /* enb_teid-mask */
+						UeIPsrcAddr:   p.appFilter.srcIPMask,         /* ueaddr ip-mask */
+						InetIPdstAddr: p.appFilter.dstIPMask,         /* inet ip-mask */
+						UeSrcPort:     uint32(r.srcMask),             /* ue port-mask */
+						InetSrcPort:   uint32(r.dstMask),             /* inet port-mask */
+						ProtoID:       uint32(p.appFilter.protoMask), /* proto id-mask */
+					},
+				}
+
+				any, err = anypb.New(f)
+				if err != nil {
+					log.Println("[eBPF PDR] Error marshalling the rule", f, err)
+					return
+				}
+
+				b.processUPFeBPFPDR(ctx, any, upfMsgTypeDel)
+			}
 		}
 		done <- true
 	}()
@@ -1094,6 +1199,40 @@ func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint
 	if err != nil {
 		logger.BessLog.Errorln("process QER failed for appQERLookup add operation")
 	}
+
+	if b.eBPFFastPath {
+		log.Tracef("[eBPF Fast Path] Application QER rule")
+		q := &pb.UPFeBPFCommandAddAppQoSArg{
+			QosVal: &pb.QoSValues{
+				Cir: cir, /* committed info rate */
+				Pir: pir, /* peak info rate */
+				Cbs: cbs, /* committed burst size */
+				Pbs: pbs, /* Peak burst size */
+				Ebs: ebs, /* Excess burst size */
+			},
+			Keys: &pb.AppQoSKeysData{
+				SrcIface: uint64(srcIface),  /* Src Intf */
+				QerID:    uint32(qer.qerID), /* qer_id */
+				FseID:    uint32(qer.fseID), /* fseid */
+			},
+			Values: &pb.AppQoSValuesData{
+				QfiID: uint32(qer.qfi), /* QFI */
+			},
+		}
+
+		any, err = anypb.New(q)
+		if err != nil {
+			log.Errorln("Error marshalling the rule", q, err)
+			return
+		}
+
+		qosTableName := AppQerLookup
+
+		err = b.processQEReBPF(ctx, any, upfMsgTypeAdd, qosTableName)
+		if err != nil {
+			log.Errorln("process QER failed for appQERLookup add operation")
+		}
+	}
 }
 
 func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
@@ -1149,6 +1288,30 @@ func (b *bess) delApplicationQER(
 	if err != nil {
 		logger.BessLog.Errorln("process QER failed for appQERLookup del operation")
 	}
+
+	if b.eBPFFastPath {
+		log.Tracef("[eBPF Fast Path] Application QER rule")
+		q := &pb.UPFeBPFCommandDelAppQoSArg{
+			Keys: &pb.AppQoSKeysData{
+				SrcIface: uint64(srcIface),  /* Src Intf */
+				QerID:    uint32(qer.qerID), /* qer_id */
+				FseID:    uint32(qer.fseID), /* fseid */
+			},
+		}
+
+		any, err = anypb.New(q)
+		if err != nil {
+			log.Errorln("Error marshalling the rule", q, err)
+			return
+		}
+
+		qosTableName := AppQerLookup
+
+		err = b.processQEReBPF(ctx, any, upfMsgTypeDel, qosTableName)
+		if err != nil {
+			log.Errorln("process QER failed for appQERLookup del operation")
+		}
+	}
 }
 
 func (b *bess) processFAR(ctx context.Context, any *anypb.Any, method upfMsgType) {
@@ -1190,6 +1353,27 @@ func (b *bess) processGtpuPathMonitoring(ctx context.Context, any *anypb.Any, me
 
 	if err != nil || resp.GetError() != nil {
 		logger.BessLog.Errorf("gtpuPathMonitoring method failed with resp: %v, err: %v", resp, err)
+	}
+}
+
+func (b *bess) processFAReBPFPDR(ctx context.Context, any *anypb.Any, method upfMsgType) {
+	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
+		log.Println("Invalid method name: ", method)
+		return
+	}
+
+	methods := [...]string{"add_far", "add", "delete_far", "clear"}
+
+	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: "upfeBPF",
+		Cmd:  methods[method],
+		Arg:  any,
+	})
+
+	log.Traceln("upfeBPF FAR resp : ", resp)
+
+	if err != nil || resp.GetError() != nil {
+		log.Errorf("upfeBPF FAR method failed with resp: %v, err: %v\n", resp, err)
 	}
 }
 
@@ -1244,6 +1428,32 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 
 		b.processFAR(ctx, any, upfMsgTypeAdd)
 
+		if b.eBPFFastPath {
+			log.Tracef("[eBPF Fast Path] FAR rule")
+			f := &pb.UPFeBPFCommandAddFARArg{
+				Keys: &pb.FARKeysData{
+					FarID: uint32(far.farID), /* far_id */
+					FseID: uint32(far.fseID), /* fseid */
+				},
+				Values: &pb.FARValuesData{
+					Action:       uint64(action),           /* action */
+					TunnelType:   uint64(far.tunnelType),   /* tunnel_out_type */
+					TunnelIP4Src: uint32(far.tunnelIP4Src), /* access-ip */
+					TunnelIP4Dst: uint32(far.tunnelIP4Dst), /* enb ip */
+					TunnelTEID:   uint32(far.tunnelTEID),   /* enb teid */
+					TunnelPort:   uint32(far.tunnelPort),   /* udp gtpu port */
+				},
+			}
+
+			any, err = anypb.New(f)
+			if err != nil {
+				log.Println("Error marshalling the rule", f, err)
+				return
+			}
+
+			b.processFAReBPFPDR(ctx, any, upfMsgTypeAdd)
+		}
+
 		if enableGtpuPathMonitoring {
 			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
 				GnbIp: far.tunnelIP4Dst, /* gnb ip */
@@ -1283,6 +1493,24 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 		}
 
 		b.processFAR(ctx, any, upfMsgTypeDel)
+
+		if b.eBPFFastPath {
+			log.Tracef("[eBPF Fast Path] FAR rule")
+			f := &pb.UPFeBPFCommandDeleteFARArg{
+				Keys: &pb.FARKeysData{
+					FarID: uint32(far.farID), /* far_id */
+					FseID: uint32(far.fseID), /* fseid */
+				},
+			}
+
+			any, err = anypb.New(f)
+			if err != nil {
+				log.Println("Error marshalling the rule", f, err)
+				return
+			}
+
+			b.processFAReBPFPDR(ctx, any, upfMsgTypeDel)
+		}
 
 		if enableGtpuPathMonitoring {
 			g := &pb.GtpuPathMonitoringCommandAddDeleteArg{
@@ -1442,6 +1670,37 @@ func (b *bess) processQER(ctx context.Context, any *anypb.Any, method upfMsgType
 	return nil
 }
 
+func (b *bess) processQEReBPF(ctx context.Context, any *anypb.Any, method upfMsgType, qosTableName string) error {
+	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
+		return ErrInvalidArgument("method name", method)
+	}
+
+	var methods []string
+
+	if qosTableName == AppQerLookup {
+		methods = append(methods, []string{"add_app_qos", "add", "delete_app_qos", "clear"}...)
+	} else if qosTableName == SessQerLookup {
+		methods = append(methods, []string{"add_session_qos", "add", "delete_session_qos", "clear"}...)
+	} else {
+		return nil
+	}
+
+	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
+		Name: "upfeBPF",
+		Cmd:  methods[method],
+		Arg:  any,
+	})
+
+	log.Traceln("upfeBPF qerlookup resp : ", resp)
+
+	if err != nil || resp.GetError() != nil {
+		log.Errorf("upfeBPF %v for qer %v failed with resp: %v, error: %v", qosTableName, methods[method], resp, err)
+		return err
+	}
+
+	return nil
+}
+
 func (b *bess) addSessionQER(ctx context.Context, gate uint64, srcIface uint8,
 	cir uint64, pir uint64, cbs uint64,
 	pbs uint64, ebs uint64, qer qer) {
@@ -1475,6 +1734,35 @@ func (b *bess) addSessionQER(ctx context.Context, gate uint64, srcIface uint8,
 	if err != nil {
 		logger.BessLog.Errorln("process QER failed for sessionQERLookup add operation")
 	}
+
+	if b.eBPFFastPath {
+		q := &pb.UPFeBPFCommandAddSessionQoSArg{
+			QosVal: &pb.QoSValues{
+				Cir: cir, /* committed info rate */
+				Pir: pir, /* peak info rate */
+				Cbs: cbs, /* committed burst size */
+				Pbs: pbs, /* Peak burst size */
+				Ebs: ebs, /* Excess burst size */
+			},
+			Keys: &pb.SessionQoSKeysData{
+				SrcIface: uint64(srcIface),  /* Src Intf */
+				FseID:    uint32(qer.fseID), /* fseid */
+			},
+		}
+
+		any, err = anypb.New(q)
+		if err != nil {
+			log.Errorln("Error marshalling the rule", q, err)
+			return
+		}
+
+		qosTableName := SessQerLookup
+
+		err = b.processQEReBPF(ctx, any, upfMsgTypeAdd, qosTableName)
+		if err != nil {
+			log.Errorln("process QER failed for sessionQERLookup add operation")
+		}
+	}
 }
 
 func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
@@ -1501,6 +1789,28 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 	err = b.processQER(ctx, any, upfMsgTypeDel, qosTableName)
 	if err != nil {
 		logger.BessLog.Errorln("process QER failed for sessionQERLookup del operation")
+	}
+
+	if b.eBPFFastPath {
+		q := &pb.UPFeBPFCommandDelSessionQoSArg{
+			Keys: &pb.SessionQoSKeysData{
+				SrcIface: uint64(srcIface),  /* Src Intf */
+				FseID:    uint32(qer.fseID), /* fseid */
+			},
+		}
+
+		any, err = anypb.New(q)
+		if err != nil {
+			log.Println("Error marshalling the rule", q, err)
+			return
+		}
+
+		qosTableName := SessQerLookup
+
+		err = b.processQEReBPF(ctx, any, upfMsgTypeDel, qosTableName)
+		if err != nil {
+			log.Errorln("process QER failed for sessionQERLookup del operation")
+		}
 	}
 }
 

@@ -6,6 +6,9 @@
 ARG SCAPY_VER=2.4.5
 ARG PTF_VER=c5299ea2e27386653209af458757b3b15e5dec5d
 ARG TREX_VER=2.92-scapy-2.4.5
+# versions in seb's file
+# ARG PTF_VER=8140532764fff58b40d0c5c995f058a6e1b36a55
+# ARG TREX_VER=3532cf99daf6dd3a1a284d0f1c388f1773eadc8a
 ARG TREX_EXT_LIBS=/external_libs
 ARG TREX_LIBS=/trex_python
 ARG UNITTEST_XML_REPORTING_VER=3.0.4
@@ -78,7 +81,8 @@ RUN pip3 install --no-cache-dir \
     scipy \
     numpy \
     matplotlib \
-    pyyaml
+    pyyaml \
+    progressbar2
 
 ENV TREX_EXT_LIBS=${TREX_EXT_LIBS}
 ENV PYTHONPATH=${TREX_EXT_LIBS}:${TREX_LIBS}

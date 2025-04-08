@@ -7,8 +7,80 @@ FROM registry.aetherproject.org/sdcore/bess_build:latest AS bess-build
 ARG CPU=native
 ARG BESS_COMMIT=main
 ENV PLUGINS_DIR=plugins
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y install \
+        ca-certificates python3-pip software-properties-common \
+        libelf-dev sudo kmod python3-pyverbs curl python-is-python3 \
+        linux-tools-common linux-tools-generic \
+        python3-pyverbs pkg-config git make apt-transport-https \
+        g++ libunwind8-dev liblzma-dev zlib1g-dev \
+        libpcap-dev libssl-dev libnuma-dev git \
+        python3-scapy libgflags-dev libgoogle-glog-dev \
+        libgraph-easy-perl libgtest-dev \
+        libc-ares-dev libbenchmark-dev \
+        libgtest-dev wget autoconf \
+        automake cmake libtool \
+        make ninja-build patch python3-pip \
+        unzip virtualenv zip tar meson \
+        libelf-dev libz-dev libnl-3-dev
+
 ARG MAKEFLAGS
 ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig
+
+## Mellanox OFED Driver
+ARG ENABLE_MLX
+COPY install_mlx_ofed.sh .
+RUN ./install_mlx_ofed.sh
+
+WORKDIR /grpc
+RUN git clone -b v1.44.0 https://github.com/grpc/grpc
+RUN cd /grpc/grpc && git submodule init && git submodule update --recursive 
+RUN cd /grpc/grpc && mkdir -p cmake/build && cd cmake/build && \
+    cmake ../.. -DgRPC_INSTALL=ON              \
+              -DCMAKE_BUILD_TYPE=Release       \
+              -DgRPC_ABSL_PROVIDER=module     \
+              -DgRPC_CARES_PROVIDER=module    \
+              -DgRPC_PROTOBUF_PROVIDER=module \
+              -DgRPC_RE2_PROVIDER=module      \
+              -DgRPC_SSL_PROVIDER=package      \
+              -DgRPC_ZLIB_PROVIDER=package &&  \
+    make -j$(getconf _NPROCESSORS_ONLN) && sudo make install
+
+RUN cd /grpc/grpc/third_party/protobuf && \
+    git submodule update --init --recursive && \
+    ./autogen.sh && ./configure && \
+    make -j$(getconf _NPROCESSORS_ONLN) && sudo make install && sudo ldconfig
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y install \
+        curl zip unzip tar meson
+
+# The following packages are needed to run bessctl
+RUN pip3 install --user protobuf grpcio scapy
+
+# linux ver should match target machine's kernel
+WORKDIR /libbpf
+# ARG LIBBPF_VER=v0.3
+ARG LIBBPF_VER=v0.7.0
+RUN curl -L https://github.com/libbpf/libbpf/tarball/${LIBBPF_VER} | \
+    tar xz -C . --strip-components=1 && \
+    cd src && PREFIX=/usr LIBDIR=/usr/lib UAPIDIR=/usr/include make install && \
+    PREFIX=/usr LIBDIR=/usr/lib UAPIDIR=/usr/include make install_uapi_headers && \
+    ldconfig
+
+WORKDIR /bpftool
+COPY xdp-plugin xdp-scripts
+RUN ./xdp-scripts/install-dependencies.sh && \
+    rm -rf /bpftool
+
+# RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-12 100 && \
+#     update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100
+
+WORKDIR /libxdp
+ARG LIBXDP_VER=libxdp-cpp
+RUN git clone -b libxdp-cpp https://github.com/sebymiano/xdp-tools.git && \
+    cd xdp-tools && ./configure && make libxdp && \
+    sudo make libxdp install
 
 RUN apt-get update && apt-get install -y \
     --no-install-recommends \
@@ -32,6 +104,10 @@ RUN ./build.py dpdk
 RUN mkdir -p plugins && \
     mv sample_plugin plugins
 
+COPY upf-ebpf upf-ebpf
+COPY upf-ebpf/protobuf/upf_ebpf_msg.proto /protobuf/
+RUN mv upf-ebpf plugins/upf-ebpf
+
 ## Network Token
 ARG ENABLE_NTF
 ARG NTF_COMMIT=master
@@ -50,7 +126,7 @@ RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
     cp core/modules/*.so /bin/modules && \
     mkdir -p /opt/bess && \
     cp -r bessctl pybess /opt/bess && \
-    cp -r core/pb /pb
+    cp -r core/pb /pb 
 
 # Stage bess: creates the runtime image of BESS
 FROM ubuntu:24.04 AS bess
@@ -67,10 +143,63 @@ RUN apt-get update && apt-get install -y \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     pip install --no-cache-dir --break-system-packages -r requirements.txt
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y install \
+        ca-certificates python3-pip software-properties-common \
+        libelf-dev sudo kmod python3-pyverbs curl python-is-python3 \
+        linux-tools-common linux-tools-generic \
+        python3-pyverbs pkg-config git make apt-transport-https \
+        g++ libunwind8-dev liblzma-dev zlib1g-dev \
+        libpcap-dev libssl-dev libnuma-dev git \
+        python3-scapy libgflags-dev libgoogle-glog-dev \
+        libgraph-easy-perl libgtest-dev \
+        libc-ares-dev libbenchmark-dev \
+        libgtest-dev wget autoconf \
+        automake cmake libtool \
+        make ninja-build patch python3-pip \
+        unzip virtualenv zip tar meson \
+        libelf-dev libz-dev libnl-3-dev
+
+## Mellanox OFED Driver
+ARG ENABLE_MLX
+COPY install_mlx_ofed.sh .
+RUN ./install_mlx_ofed.sh
+
+# linux ver should match target machine's kernel
+WORKDIR /libbpf
+# ARG LIBBPF_VER=v0.3
+ARG LIBBPF_VER=v0.7.0
+RUN curl -L https://github.com/libbpf/libbpf/tarball/${LIBBPF_VER} | \
+    tar xz -C . --strip-components=1 && \
+    cd src && PREFIX=/usr LIBDIR=/usr/lib UAPIDIR=/usr/include make install && \
+    PREFIX=/usr LIBDIR=/usr/lib UAPIDIR=/usr/include make install_uapi_headers && \
+    ldconfig
+
+WORKDIR /bpftool
+COPY xdp-plugin xdp-scripts
+RUN ./xdp-scripts/install-dependencies.sh && \
+    rm -rf /bpftool
+
+# RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-12 100 && \
+#     update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100
+
+WORKDIR /libxdp
+ARG LIBXDP_VER=libxdp-cpp
+RUN git clone -b libxdp-cpp https://github.com/sebymiano/xdp-tools.git && \
+    cd xdp-tools && ./configure && make libxdp && \
+    sudo make libxdp install && sudo ldconfig
+
+RUN rm -rf /var/lib/apt/lists/* && \
+    apt-get --purge remove -y \
+        gcc
+
 COPY --from=bess-build /opt/bess /opt/bess
 COPY --from=bess-build /bin/bessd /bin/bessd
 COPY --from=bess-build /bin/modules /bin/modules
 COPY conf /opt/bess/bessctl/conf
+COPY upf-ebpf/bessctl_conf/upf-ebpf.bess /opt/bess/bessctl/conf/upf-ebpf.bess
+COPY upf-ebpf/bessctl_conf/upf-ebpf-af_xdp.bess /opt/bess/bessctl/conf/upf-ebpf-af_xdp.bess
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 
 # CNDP: Install dependencies

@@ -55,24 +55,32 @@ kwargs = {'size_inc_q': 512,
           'num_out_q': num_q}
 p = PMDPort(port_id=0, **kwargs)
 
-n3seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", n3seq_offset, 0x30000000)
+#n3seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", n3seq_offset, 0x30000000)
 n9seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", n9seq_offset, 0x90000000)
 n6seq_kwargs = sim.gen_inet_sequpdate_args(flows, "16.0.0.1")
+n3seq_kwargs = sim.gen_inet_sequpdate_args(flows, "11.1.1.129")
 
 # 25 Gbps each to saturate 100 Gbps
-bess.add_tc('39_limit', wid=0, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
-bess.add_tc('36_limit', wid=0, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
-bess.add_tc('6_limit',  wid=1, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
-bess.add_tc('9_limit',  wid=1, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
+#bess.add_tc('39_limit', wid=0, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
+#bess.add_tc('36_limit', wid=0, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
+#bess.add_tc('6_limit',  wid=1, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
+#bess.add_tc('9_limit',  wid=1, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
 
-src39::Source(pkt_size=pkt_size) -> Rewrite(templates=n39_pkts) -> n39update::SequentialUpdate(**n3seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=0)
-src36::Source(pkt_size=pkt_size) -> Rewrite(templates=n36_pkts) -> n36update::SequentialUpdate(**n3seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=1)
+rr::RoundRobin(gates=[0,1,2,3]) #create a RoundRobin with two gates
 
-src9::Source(pkt_size=pkt_size) -> Rewrite(templates=n9_pkts) -> n9update::SequentialUpdate(**n9seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=2)
-src6::Source(pkt_size=pkt_size) -> Rewrite(templates=n6_pkts) -> n6update::SequentialUpdate(**n6seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=3)
+#src39::Source(pkt_size=pkt_size) -> Rewrite(templates=n39_pkts) -> n39update::SequentialUpdate(**n3seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=0)
 
-src39.attach_task(parent='39_limit')
-src36.attach_task(parent='36_limit')
+src36::Source(pkt_size=pkt_size) -> Rewrite(templates=n36_pkts) -> n36update::SequentialUpdate(**n3seq_kwargs) -> L4Checksum() -> IPChecksum() -> rr
+#src9::Source(pkt_size=pkt_size) -> Rewrite(templates=n9_pkts) -> n9update::SequentialUpdate(**n9seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=2)
+#src6::Source(pkt_size=pkt_size) -> Rewrite(templates=n6_pkts) -> n6update::SequentialUpdate(**n6seq_kwargs) -> L4Checksum() -> IPChecksum() -> rr
 
-src9.attach_task(parent='9_limit')
-src6.attach_task(parent='6_limit')
+rr:0 -> QueueOut(port=p.name, qid=0)
+rr:1 -> QueueOut(port=p.name, qid=1)
+rr:2 -> QueueOut(port=p.name, qid=2)
+rr:3 -> QueueOut(port=p.name, qid=3)
+
+#src39.attach_task(parent='39_limit')
+#src36.attach_task(parent='36_limit')
+
+#src9.attach_task(parent='9_limit')
+#src6.attach_task(parent='6_limit')

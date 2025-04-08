@@ -20,6 +20,9 @@ CPU                      ?= native
 # information)
 ENABLE_NTF               ?= 0
 
+# Enable Mellanox driver installation
+ENABLE_MLX               ?= 0
+
 ## Docker related
 DOCKER_REGISTRY          ?=
 DOCKER_REPOSITORY        ?=
@@ -27,7 +30,7 @@ DOCKER_TAG               ?= ${VERSION}
 DOCKER_IMAGENAME         := ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}${PROJECT_NAME}:${DOCKER_TAG}
 DOCKER_BUILDKIT          ?= 1
 DOCKER_BUILD_ARGS        ?= --build-arg MAKEFLAGS=-j${NPROCS} --build-arg CPU
-DOCKER_BUILD_ARGS        += --build-arg ENABLE_NTF=$(ENABLE_NTF)
+DOCKER_BUILD_ARGS        += --build-arg ENABLE_NTF=$(ENABLE_NTF) --build-arg ENABLE_MLX=$(ENABLE_MLX)
 DOCKER_PULL              ?= --pull
 
 ## Docker labels. Only set ref and commit date if committed

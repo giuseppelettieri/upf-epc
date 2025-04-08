@@ -48,6 +48,7 @@ class Port:
         self.name = name
         self.flow_profiles = []
         self.workers = None
+        self.enable_ebpf_fp = False
         self.num_q = 1
         self.fpi = None
         self.fpo = None
@@ -135,7 +136,18 @@ class Port:
         s = Sink(name="{}bad_route".format(name))
         self.rtr.connect(next_mod=s, ogate=MAX_GATES - 1)
 
-    def init_port(self, idx, conf_mode):
+    def configure_rx_queues(self):
+        iface_name = self.name
+        number_rx_queue = len(self.workers)
+        print(f"Setting NIC rx queue size for iface:{iface_name} to {number_rx_queue}")
+        cmd = 'sudo -S ethtool -L {} combined {}'.format(iface_name, int(number_rx_queue))
+        print("Running ethtool... {}".format(cmd))
+        ret = os.popen(cmd).read()
+        if ret:
+            print(ret)
+        print(f"Setting NIC rx queue size for iface: {iface_name} DONE")
+
+    def init_port(self, idx, conf_mode, bpf_prog_id=None):
         name = self.name
         num_q = len(self.workers)
         self.num_q = num_q
@@ -152,13 +164,13 @@ class Port:
             try:
                 # Initialize kernel datapath.
                 # AF_XDP requires that num_rx_qs == num_tx_qs
-                kwargs = {
-                    "vdev": "net_af_xdp{},iface={},start_queue=0,queue_count={}".format(
-                        idx, name, num_q
-                    ),
-                    "num_out_q": num_q,
-                    "num_inc_q": num_q,
-                }
+                if conf_mode == 'af_xdp':
+                    kwargs = {"vdev" : "net_af_xdp{},iface={},start_queue=0,queue_count={},pinned_xdp_prog_id={}"
+                            .format(idx, name, num_q, int(bpf_prog_id)), "num_out_q": num_q, "num_inc_q": num_q}
+                else:
+                    kwargs = {"vdev" : "net_af_xdp{},iface={},start_queue=0,queue_count={}"
+                            .format(idx, name, num_q), "num_out_q": num_q, "num_inc_q": num_q}
+                
                 self.init_datapath(**kwargs)
             except:
                 if conf_mode == "linux":
@@ -242,14 +254,10 @@ class Port:
                 # Initialize DPDK datapath
                 fidx = dpdk_ports.get(mac_by_interface(name))
                 if fidx is None:
-                    raise Exception("Registered port for {} not detected!".format(name))
-                kwargs = {
-                    "port_id": fidx,
-                    "num_out_q": num_q,
-                    "num_inc_q": num_q,
-                    "hwcksum": self.hwcksum,
-                    "flow_profiles": self.flow_profiles,
-                }
+                    print(dpdk_ports)
+                    raise Exception(
+                        'Registered port for {} not detected!'.format(name))
+                kwargs = {"port_id": fidx, "num_out_q": num_q, "num_inc_q": num_q, "hwcksum": self.hwcksum, "flow_profiles": self.flow_profiles}
                 self.init_datapath(**kwargs)
 
             # Initialize kernel slowpath port and RX/TX modules

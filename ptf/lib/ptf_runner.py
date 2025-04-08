@@ -261,17 +261,22 @@ def main():
     # if unary test, can skip TRex set up and just run PTF command
     else:
         info("Running unary test(s)...")
+        # success = run_test(
+        #     p4info_path=args.p4info,
+        #     device_id=args.device_id,
+        #     grpc_addr=args.grpc_addr,
+        #     cpu_port=args.cpu_port,
+        #     ptfdir=args.ptf_dir,
+        #     port_map_path=args.port_map,
+        #     platform=args.platform,
+        #     generate_tv=args.generate_tv,
+        #     loopback=args.loopback,
+        #     profile=args.profile,
+        #     extra_args=unknown_args,
+        # )
         success = run_test(
-            p4info_path=args.p4info,
-            device_id=args.device_id,
-            grpc_addr=args.grpc_addr,
-            cpu_port=args.cpu_port,
+            bess_addr=args.bess_address,
             ptfdir=args.ptf_dir,
-            port_map_path=args.port_map,
-            platform=args.platform,
-            generate_tv=args.generate_tv,
-            loopback=args.loopback,
-            profile=args.profile,
             extra_args=unknown_args,
         )
         if not success:

@@ -45,6 +45,7 @@ class Parser:
         self.core_ifname = None
         self.interfaces = dict()
         self.enable_ntf = False
+        self.enable_ebpf_fp = False
         self.notify_sockaddr = "/tmp/notifycp"
         self.endmarker_sockaddr = "/tmp/pfcpport"
         self.enable_slice_metering = False
@@ -194,6 +195,12 @@ class Parser:
             self.enable_ntf = bool(self.conf["enable_ntf"])
         except KeyError:
             print("Network Token Function disabled")
+
+        # eBPF Fast Path
+        try:
+            self.enable_ebpf_fp = bool(self.conf['enable_ebpf_fp'])
+        except KeyError:
+            print('eBPF Fast Path disabled')
 
         # Flow measurements
         try:
