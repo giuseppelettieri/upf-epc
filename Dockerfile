@@ -70,8 +70,13 @@ COPY xdp-plugin xdp-scripts
 RUN ./xdp-scripts/install-dependencies.sh && \
     rm -rf /bpftool
 
-# RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-12 100 && \
-#     update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100
+RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add - && \
+    add-apt-repository -y "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-18 main" && \
+    apt-get update && apt-get install -y clang-18 clang-tools-18 clang-format-18 llvm-18 llvm-18-dev llvm-18-tools llvm-18-runtime && \
+    update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100 \
+    --slave /usr/bin/clang++ clang++ /usr/bin/clang++-18 \
+    --slave /usr/bin/llc llc /usr/bin/llc-18 && \
+    update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-18 100
 
 WORKDIR /libxdp
 ARG LIBXDP_VER=libxdp-cpp-v1.5.0
