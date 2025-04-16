@@ -171,12 +171,9 @@ RUN ./install_mlx_ofed.sh
 
 # linux ver should match target machine's kernel
 WORKDIR /libbpf
-# ARG LIBBPF_VER=v0.3
-ARG LIBBPF_VER=v0.7.0
-RUN curl -L https://github.com/libbpf/libbpf/tarball/${LIBBPF_VER} | \
-    tar xz -C . --strip-components=1 && \
-    cd src && PREFIX=/usr LIBDIR=/usr/lib UAPIDIR=/usr/include make install && \
-    PREFIX=/usr LIBDIR=/usr/lib UAPIDIR=/usr/include make install_uapi_headers && \
+ARG LIBBPF_VER=v1.5.0
+RUN git clone https://github.com/libbpf/libbpf.git --branch ${LIBBPF_VER} --single-branch && \
+    cd libbpf/src && make install && make install_uapi_headers && \
     ldconfig
 
 WORKDIR /bpftool
