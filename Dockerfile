@@ -151,7 +151,7 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install \
         ca-certificates python3-pip software-properties-common \
         libelf-dev sudo kmod python3-pyverbs curl python-is-python3 \
-        linux-tools-common linux-tools-generic \
+        linux-tools-common linux-tools-generic linux-headers-`uname -r`\
         python3-pyverbs pkg-config git make apt-transport-https \
         g++ libunwind8-dev liblzma-dev zlib1g-dev \
         libpcap-dev libssl-dev libnuma-dev git \
@@ -163,6 +163,8 @@ RUN apt-get update && \
         make ninja-build patch python3-pip \
         unzip virtualenv zip tar meson \
         libelf-dev libz-dev libnl-3-dev clang llvm
+
+RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/asm
 
 ## Mellanox OFED Driver
 ARG ENABLE_MLX
