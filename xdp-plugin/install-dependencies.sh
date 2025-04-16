@@ -7,7 +7,7 @@ COLOR_OFF='\033[0m' # No Color
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 KERNEL_DOWNLOAD_SCRIPT=$DIR/get-verified-tarball.sh
-BPFTOOL_VERSION=5.13
+BPFTOOL_VERSION=7.3.0
 
 function install_linux_bpftool {
   echo -e "${COLOR_GREEN} Installing Linux bpftool v${BPFTOOL_VERSION} ${COLOR_OFF}"
@@ -39,7 +39,7 @@ function install_linux_bpftool {
   pushd .
   mkdir -p "${DIR}/deps"
   cd "${DIR}/deps"
-  git clone --recurse-submodules https://github.com/libbpf/bpftool.git
+  git clone --recurse-submodules https://github.com/libbpf/bpftool.git --branch ${BPFTOOL_VERSION} --single-branch
   cd bpftool/src
   make -j "$(getconf _NPROCESSORS_ONLN)"
   $SUDO make install
