@@ -185,8 +185,8 @@ RUN ./xdp-scripts/install-dependencies.sh && \
 #     update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100
 
 WORKDIR /libxdp
-ARG LIBXDP_VER=libxdp-cpp
-RUN git clone -b libxdp-cpp https://github.com/sebymiano/xdp-tools.git && \
+ARG LIBXDP_VER=libxdp-cpp-v1.5.0
+RUN git clone https://github.com/alefais/xdp-tools.git --branch ${LIBXDP_VER} --single-branch && \
     cd xdp-tools && ./configure && make libxdp && \
     sudo make libxdp install && sudo ldconfig
 
