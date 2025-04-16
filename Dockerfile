@@ -5,7 +5,6 @@
 # Stage bess-build: fetch BESS dependencies & pre-reqs
 FROM registry.aetherproject.org/sdcore/bess_build:latest AS bess-build
 ARG CPU=native
-ARG BESS_COMMIT=seb
 ENV PLUGINS_DIR=plugins
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install \
@@ -33,8 +32,9 @@ COPY install_mlx_ofed.sh .
 RUN ./install_mlx_ofed.sh
 
 WORKDIR /grpc
-RUN git clone -b v1.44.0 https://github.com/grpc/grpc
-RUN cd /grpc/grpc && git submodule init && git submodule update --recursive 
+ARG GRPC_VER=v1.44.0
+RUN git clone https://github.com/grpc/grpc --branch ${GRPC_VER} --single-branch && \
+    cd /grpc/grpc && git submodule init && git submodule update --recursive
 RUN cd /grpc/grpc && mkdir -p cmake/build && cd cmake/build && \
     cmake ../.. -DgRPC_INSTALL=ON              \
               -DCMAKE_BUILD_TYPE=Release       \
@@ -95,6 +95,7 @@ RUN apt-get update && apt-get install -y \
 
 # BESS pre-reqs
 WORKDIR /bess
+ARG BESS_COMMIT=seb
 RUN git clone https://github.com/giuseppelettieri/bess.git . && \
     git checkout ${BESS_COMMIT} && \
     cp -a protobuf /protobuf
