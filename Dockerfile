@@ -80,8 +80,8 @@ RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add - && \
 
 WORKDIR /libxdp
 ARG LIBXDP_VER=libxdp-cpp-v1.5.0
-RUN git clone https://github.com/alefais/xdp-tools.git --branch ${LIBXDP_VER} --single-branch && \
-    cd xdp-tools && ./configure && make libxdp && \
+RUN git clone --recurse-submodules https://github.com/alefais/xdp-tools.git --branch ${LIBXDP_VER} --single-branch && \
+    cd xdp-tools && FORCE_SUBDIR_LIBBPF=1 ./configure && make libxdp && \
     sudo make libxdp install
 
 RUN apt-get update && apt-get install -y \
