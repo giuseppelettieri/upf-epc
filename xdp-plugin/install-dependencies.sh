@@ -7,10 +7,10 @@ COLOR_OFF='\033[0m' # No Color
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 KERNEL_DOWNLOAD_SCRIPT=$DIR/get-verified-tarball.sh
-BPFTOOL_VERSION=7.3.0
+BPFTOOL_VERSION=v7.3.0
 
 function install_linux_bpftool {
-  echo -e "${COLOR_GREEN} Installing Linux bpftool v${BPFTOOL_VERSION} ${COLOR_OFF}"
+  echo -e "${COLOR_GREEN} Installing Linux bpftool ${BPFTOOL_VERSION} ${COLOR_OFF}"
 
   # Let's first check if bpftool is available
   # local bpftool_check1=$(command -v bpftool &> /dev/null; echo $?)
@@ -31,7 +31,7 @@ function install_linux_bpftool {
   # ${KERNEL_DOWNLOAD_SCRIPT} ${BPFTOOL_VERSION}
 
   # if [ $? -ne 0 ]; then
-  #   echo -e "${COLOR_RED} Unable to install Linux bpftool v${BPFTOOL_VERSION} ${COLOR_OFF}"
+  #   echo -e "${COLOR_RED} Unable to install Linux bpftool ${BPFTOOL_VERSION} ${COLOR_OFF}"
   #   echo -e "${COLOR_RED} You can try to install it manually${COLOR_OFF}"
   #   return
   # fi
