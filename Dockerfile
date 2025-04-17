@@ -96,8 +96,7 @@ RUN apt-get update && apt-get install -y \
 # BESS pre-reqs
 WORKDIR /bess
 ARG BESS_COMMIT=seb
-RUN git clone https://github.com/giuseppelettieri/bess.git . && \
-    git checkout ${BESS_COMMIT} && \
+RUN git clone https://github.com/giuseppelettieri/bess.git --branch ${BESS_COMMIT} --single-branch . && \
     cp -a protobuf /protobuf
 
 # Build DPDK
