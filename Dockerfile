@@ -60,7 +60,7 @@ RUN pip3 install --user protobuf grpcio scapy
 
 # linux ver should match target machine's kernel
 WORKDIR /libbpf
-ARG LIBBPF_VER=v1.5.0
+ARG LIBBPF_VER=v0.7.0
 RUN git clone https://github.com/libbpf/libbpf.git --branch ${LIBBPF_VER} --single-branch && \
     cd libbpf/src && make install && make install_uapi_headers && \
     ldconfig
