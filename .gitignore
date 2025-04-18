@@ -12,5 +12,6 @@ dpdk-devbind.py
 dpdk-hugepages.py
 dictionary.dic
 venv/
+/upf-ebpf/
 ptf/log/
 .vscode
