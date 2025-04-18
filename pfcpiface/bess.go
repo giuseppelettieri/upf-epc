@@ -867,7 +867,7 @@ func (b *bess) processPDR(ctx context.Context, any *anypb.Any, method upfMsgType
 
 func (b *bess) processUPFeBPFPDR(ctx context.Context, any *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		log.Println("Invalid method name: ", method)
+		logger.BessLog.Infoln("Invalid method name: ", method)
 		return
 	}
 
@@ -879,10 +879,10 @@ func (b *bess) processUPFeBPFPDR(ctx context.Context, any *anypb.Any, method upf
 		Arg:  any,
 	})
 
-	log.Traceln("upfeBPF resp : ", resp)
+	logger.BessLog.Debugln("upfeBPF resp : ", resp)
 
 	if err != nil || resp.GetError() != nil {
-		log.Errorf("upfeBPF method failed with resp: %v, err: %v\n", resp, err)
+		logger.BessLog.Errorf("upfeBPF method failed with resp: %v, err: %v\n", resp, err)
 	}
 }
 
@@ -952,7 +952,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 		}
 
 		if b.eBPFFastPath {
-			log.Tracef("[eBPF Fast Path] PDR rules %+v", portRules)
+			logger.BessLog.Debugf("[eBPF Fast Path] PDR rules %+v", portRules)
 			for _, r := range portRules {
 				f := &pb.UPFeBPFCommandAddPDRArg{
 					Priority: int64(math.MaxUint32 - p.precedence),
@@ -987,7 +987,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 				any, err = anypb.New(f)
 				if err != nil {
-					log.Println("[eBPF PDR] Error marshalling the rule", f, err)
+					logger.BessLog.Infoln("[eBPF PDR] Error marshalling the rule", f, err)
 					return
 				}
 
@@ -1047,7 +1047,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 		}
 
 		if b.eBPFFastPath {
-			log.Tracef("[eBPF Fast Path] PDR rules %+v", portRules)
+			logger.BessLog.Debugf("[eBPF Fast Path] PDR rules %+v", portRules)
 			for _, r := range portRules {
 				f := &pb.UPFeBPFCommandDeletePDRArg{
 					Keys: &pb.PDRKeysData{
@@ -1074,7 +1074,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 				any, err = anypb.New(f)
 				if err != nil {
-					log.Println("[eBPF PDR] Error marshalling the rule", f, err)
+					logger.BessLog.Infoln("[eBPF PDR] Error marshalling the rule", f, err)
 					return
 				}
 
@@ -1201,7 +1201,7 @@ func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint
 	}
 
 	if b.eBPFFastPath {
-		log.Tracef("[eBPF Fast Path] Application QER rule")
+		logger.BessLog.Debugf("[eBPF Fast Path] Application QER rule")
 		q := &pb.UPFeBPFCommandAddAppQoSArg{
 			QosVal: &pb.QoSValues{
 				Cir: cir, /* committed info rate */
@@ -1222,7 +1222,7 @@ func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint
 
 		any, err = anypb.New(q)
 		if err != nil {
-			log.Errorln("Error marshalling the rule", q, err)
+			logger.BessLog.Errorln("Error marshalling the rule", q, err)
 			return
 		}
 
@@ -1230,7 +1230,7 @@ func (b *bess) addApplicationQER(ctx context.Context, gate uint64, srcIface uint
 
 		err = b.processQEReBPF(ctx, any, upfMsgTypeAdd, qosTableName)
 		if err != nil {
-			log.Errorln("process QER failed for appQERLookup add operation")
+			logger.BessLog.Errorln("process QER failed for appQERLookup add operation")
 		}
 	}
 }
@@ -1290,7 +1290,7 @@ func (b *bess) delApplicationQER(
 	}
 
 	if b.eBPFFastPath {
-		log.Tracef("[eBPF Fast Path] Application QER rule")
+		logger.BessLog.Debugf("[eBPF Fast Path] Application QER rule")
 		q := &pb.UPFeBPFCommandDelAppQoSArg{
 			Keys: &pb.AppQoSKeysData{
 				SrcIface: uint64(srcIface),  /* Src Intf */
@@ -1301,7 +1301,7 @@ func (b *bess) delApplicationQER(
 
 		any, err = anypb.New(q)
 		if err != nil {
-			log.Errorln("Error marshalling the rule", q, err)
+			logger.BessLog.Errorln("Error marshalling the rule", q, err)
 			return
 		}
 
@@ -1309,7 +1309,7 @@ func (b *bess) delApplicationQER(
 
 		err = b.processQEReBPF(ctx, any, upfMsgTypeDel, qosTableName)
 		if err != nil {
-			log.Errorln("process QER failed for appQERLookup del operation")
+			logger.BessLog.Errorln("process QER failed for appQERLookup del operation")
 		}
 	}
 }
@@ -1358,7 +1358,7 @@ func (b *bess) processGtpuPathMonitoring(ctx context.Context, any *anypb.Any, me
 
 func (b *bess) processFAReBPFPDR(ctx context.Context, any *anypb.Any, method upfMsgType) {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
-		log.Println("Invalid method name: ", method)
+		logger.BessLog.Infoln("Invalid method name: ", method)
 		return
 	}
 
@@ -1370,10 +1370,10 @@ func (b *bess) processFAReBPFPDR(ctx context.Context, any *anypb.Any, method upf
 		Arg:  any,
 	})
 
-	log.Traceln("upfeBPF FAR resp : ", resp)
+	logger.BessLog.Debugln("upfeBPF FAR resp : ", resp)
 
 	if err != nil || resp.GetError() != nil {
-		log.Errorf("upfeBPF FAR method failed with resp: %v, err: %v\n", resp, err)
+		logger.BessLog.Errorf("upfeBPF FAR method failed with resp: %v, err: %v\n", resp, err)
 	}
 }
 
@@ -1429,7 +1429,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 		b.processFAR(ctx, any, upfMsgTypeAdd)
 
 		if b.eBPFFastPath {
-			log.Tracef("[eBPF Fast Path] FAR rule")
+			logger.BessLog.Debugf("[eBPF Fast Path] FAR rule")
 			f := &pb.UPFeBPFCommandAddFARArg{
 				Keys: &pb.FARKeysData{
 					FarID: uint32(far.farID), /* far_id */
@@ -1447,7 +1447,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 
 			any, err = anypb.New(f)
 			if err != nil {
-				log.Println("Error marshalling the rule", f, err)
+				logger.BessLog.Infoln("Error marshalling the rule", f, err)
 				return
 			}
 
@@ -1495,7 +1495,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 		b.processFAR(ctx, any, upfMsgTypeDel)
 
 		if b.eBPFFastPath {
-			log.Tracef("[eBPF Fast Path] FAR rule")
+			logger.BessLog.Debugf("[eBPF Fast Path] FAR rule")
 			f := &pb.UPFeBPFCommandDeleteFARArg{
 				Keys: &pb.FARKeysData{
 					FarID: uint32(far.farID), /* far_id */
@@ -1505,7 +1505,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 
 			any, err = anypb.New(f)
 			if err != nil {
-				log.Println("Error marshalling the rule", f, err)
+				logger.BessLog.Infoln("Error marshalling the rule", f, err)
 				return
 			}
 
@@ -1691,10 +1691,10 @@ func (b *bess) processQEReBPF(ctx context.Context, any *anypb.Any, method upfMsg
 		Arg:  any,
 	})
 
-	log.Traceln("upfeBPF qerlookup resp : ", resp)
+	logger.BessLog.Debugln("upfeBPF qerlookup resp : ", resp)
 
 	if err != nil || resp.GetError() != nil {
-		log.Errorf("upfeBPF %v for qer %v failed with resp: %v, error: %v", qosTableName, methods[method], resp, err)
+		logger.BessLog.Errorf("upfeBPF %v for qer %v failed with resp: %v, error: %v", qosTableName, methods[method], resp, err)
 		return err
 	}
 
@@ -1752,7 +1752,7 @@ func (b *bess) addSessionQER(ctx context.Context, gate uint64, srcIface uint8,
 
 		any, err = anypb.New(q)
 		if err != nil {
-			log.Errorln("Error marshalling the rule", q, err)
+			logger.BessLog.Errorln("Error marshalling the rule", q, err)
 			return
 		}
 
@@ -1760,7 +1760,7 @@ func (b *bess) addSessionQER(ctx context.Context, gate uint64, srcIface uint8,
 
 		err = b.processQEReBPF(ctx, any, upfMsgTypeAdd, qosTableName)
 		if err != nil {
-			log.Errorln("process QER failed for sessionQERLookup add operation")
+			logger.BessLog.Errorln("process QER failed for sessionQERLookup add operation")
 		}
 	}
 }
@@ -1801,7 +1801,7 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 
 		any, err = anypb.New(q)
 		if err != nil {
-			log.Println("Error marshalling the rule", q, err)
+			logger.BessLog.Infoln("Error marshalling the rule", q, err)
 			return
 		}
 
@@ -1809,7 +1809,7 @@ func (b *bess) delSessionQER(ctx context.Context, srcIface uint8, qer qer) {
 
 		err = b.processQEReBPF(ctx, any, upfMsgTypeDel, qosTableName)
 		if err != nil {
-			log.Errorln("process QER failed for sessionQERLookup del operation")
+			logger.BessLog.Errorln("process QER failed for sessionQERLookup del operation")
 		}
 	}
 }
