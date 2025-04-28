@@ -93,43 +93,6 @@ RUN apt-get update && apt-get install -y \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# BESS pre-reqs
-WORKDIR /bess
-ARG BESS_COMMIT=seb
-RUN git clone https://github.com/DanieleDiBella99/bess.git --branch ${BESS_COMMIT} --single-branch . && \
-    cp -a protobuf /protobuf
-
-# Build DPDK
-RUN ./build.py dpdk
-
-# Plugins: SequentialUpdate
-RUN mkdir -p plugins && \
-    mv sample_plugin plugins
-
-COPY upf-ebpf upf-ebpf
-COPY upf-ebpf/protobuf/upf_ebpf_msg.proto /protobuf/
-RUN mv upf-ebpf plugins/upf-ebpf
-
-## Network Token
-ARG ENABLE_NTF
-ARG NTF_COMMIT=master
-COPY scripts/install_ntf.sh .
-RUN ./install_ntf.sh
-
-# Build and copy artifacts
-RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
-    CMD="./build.py bess" && \
-    for PLUGIN in $PLUGINS; do \
-        CMD="$CMD --plugin \"$PLUGIN\""; \
-    done && \
-    eval "$CMD" && \
-    cp bin/bessd /bin && \
-    mkdir -p /bin/modules && \
-    cp core/modules/*.so /bin/modules && \
-    mkdir -p /opt/bess && \
-    cp -r bessctl pybess /opt/bess && \
-    cp -r core/pb /pb 
-
 # Stage bess: creates the runtime image of BESS
 FROM ubuntu:24.04 AS bess
 WORKDIR /
@@ -171,11 +134,11 @@ COPY install_mlx_ofed.sh .
 RUN ./install_mlx_ofed.sh
 
 # linux ver should match target machine's kernel
-WORKDIR /libbpf
-ARG LIBBPF_VER=v1.5.0
-RUN git clone https://github.com/libbpf/libbpf.git --branch ${LIBBPF_VER} --single-branch && \
-    cd libbpf/src && make install && make install_uapi_headers && \
-    ldconfig
+# WORKDIR /libbpf
+# ARG LIBBPF_VER=v1.5.0
+# RUN git clone https://github.com/libbpf/libbpf.git --branch ${LIBBPF_VER} --single-branch && \
+#     cd libbpf/src && make install && make install_uapi_headers && \
+#     ldconfig
 
 WORKDIR /bpftool
 COPY xdp-plugin xdp-scripts
@@ -191,13 +154,115 @@ RUN git clone https://github.com/alefais/xdp-tools.git --branch ${LIBXDP_VER} --
     cd xdp-tools && ./configure && make libxdp && \
     sudo make libxdp install && sudo ldconfig
 
+WORKDIR /libbpf0
+ARG LIBBPF_VER=v0.7.0
+RUN git clone https://github.com/libbpf/libbpf.git --branch ${LIBBPF_VER} --single-branch && \
+    cd libbpf/src && DESTDIR=/usr/bin/ make install && make install_uapi_headers && \
+    ldconfig
+# BESS pre-reqs
+#RUN apt remove --purge -y libbpf*
+#RUN ldconfig -p | grep libbpf && sleep 20
+RUN ls
+WORKDIR /bess
+ARG BESS_COMMIT=seb
+RUN git clone https://github.com/DanieleDiBella99/bess.git --branch ${BESS_COMMIT} --single-branch . && \
+    cp -a protobuf /protobuf
+# Build DPDK
+RUN ./build.py dpdk
+
+# Plugins: SequentialUpdate
+# RUN mkdir -p plugins && \
+#     mv sample_plugin plugins
+
+# COPY upf-ebpf upf-ebpf
+# COPY upf-ebpf/protobuf/upf_ebpf_msg.proto /protobuf/
+# RUN mv upf-ebpf plugins/upf-ebpf
+RUN apt-get remove --purge -y clang* llvm*
+# RUN wget https://apt.llvm.org/llvm.sh && \
+#     chmod +x llvm.sh && \
+#     ./llvm.sh 12 && apt-get update && apt-get install clang-12 lldb-12 lld-12
+RUN wget http://archive.ubuntu.com/ubuntu/pool/main/libf/libffi/libffi7_3.3-4_amd64.deb && dpkg -i libffi7_3.3-4_amd64.deb
+RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add - && \
+add-apt-repository -y "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-12 main" && \
+apt-get update && apt-get install -y clang-12 clang-tools-12 clang-format-12 llvm-12 llvm-12-dev llvm-12-tools llvm-12-runtime && \
+update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100 \
+--slave /usr/bin/clang++ clang++ /usr/bin/clang++-12 \
+--slave /usr/bin/llc llc /usr/bin/llc-12 && \
+update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-12 100
+
+RUN which clang && sleep 10
+RUN apt-get remove -y libabsl-dev gcc
+#RUN gcc --version && sleep 5
+RUN apt-get update && apt-get install -y gcc-10 g++-10
+RUN ln -sf /usr/bin/gcc-10 /usr/bin/gcc && \
+    ln -sf /usr/bin/g++-10 /usr/bin/g++
+RUN gcc --version && sleep 5
+WORKDIR /grpc
+ARG GRPC_VER=v1.44.0
+RUN git clone https://github.com/grpc/grpc --branch ${GRPC_VER} --single-branch && \
+    cd /grpc/grpc && git submodule update --init --recursive
+RUN cd /grpc/grpc && mkdir -p cmake/build && cd cmake/build && \
+    cmake ../.. -DgRPC_INSTALL=ON              \
+                -DCMAKE_BUILD_TYPE=Release     \
+                -DgRPC_ABSL_PROVIDER=module    \
+                -DgRPC_CARES_PROVIDER=module   \
+                -DgRPC_PROTOBUF_PROVIDER=module\
+                -DgRPC_RE2_PROVIDER=module     \
+                -DgRPC_SSL_PROVIDER=package    \
+                -DgRPC_ZLIB_PROVIDER=package   \
+                -DCMAKE_CXX_STANDARD=17 && \         
+    make -j$(getconf _NPROCESSORS_ONLN) && sudo make install
+
+
+RUN apt remove --purge -y libbpf*
+
+RUN mkdir -p /bess/plugins && \
+    mv /bess/sample_plugin /bess/plugins
+
+   
+COPY upf-ebpf upf-ebpf
+RUN mv upf-ebpf /bess/plugins
+RUN cd /bess/plugins/upf-ebpf && ls -al && sleep 2
+RUN cd /bess/plugins/upf-ebpf/scripts && ./install-deps.sh && sleep 10
+
+#removed support for cloud native data plane
+RUN cd /bess/core/drivers && rm cndp.cc
+
+RUN apt-get update && apt-get install -y libcap-dev libcap2-dev libsystemd-dev libgflags-dev
+
+RUN cd /bess && ./build.py bess --plugin upf-ebpf
+
+
+# RUN cp upf-ebpf/modules/*.h plugins
+# RUN cp upf-ebpf/modules/*.cc plugins
+# RUN cp upf-ebpf/modules/ebpf/* plugins
+
+## Network Token
+ARG ENABLE_NTF
+ARG NTF_COMMIT=master
+COPY scripts/install_ntf.sh .
+RUN ./install_ntf.sh
+
+# Build and copy artifacts
+RUN PLUGINS=$(find "$PLUGINS_DIR" -mindepth 1 -maxdepth 1 -type d) && \
+    CMD="./build.py bess" && \
+    for PLUGIN in $PLUGINS; do \
+        CMD="$CMD --plugin \"$PLUGIN\""; \
+    done && \
+    eval "$CMD" && \
+    cp bin/bessd /bin && \
+    mkdir -p /bin/modules && \
+    cp core/modules/*.so /bin/modules && \
+    mkdir -p /opt/bess && \
+    cp -r bessctl pybess /opt/bess && \
+    cp -r core/pb /pb 
+
+RUN cd /bin/modules && ls -al && sleep 15
+
 RUN rm -rf /var/lib/apt/lists/* && \
     apt-get --purge remove -y \
         gcc
-
-COPY --from=bess-build /opt/bess /opt/bess
-COPY --from=bess-build /bin/bessd /bin/bessd
-COPY --from=bess-build /bin/modules /bin/modules
+        
 COPY conf /opt/bess/bessctl/conf
 COPY upf-ebpf/bessctl_conf/upf-ebpf.bess /opt/bess/bessctl/conf/upf-ebpf.bess
 COPY upf-ebpf/bessctl_conf/upf-ebpf-af_xdp.bess /opt/bess/bessctl/conf/upf-ebpf-af_xdp.bess
