@@ -62,9 +62,7 @@ RUN pip3 install --user protobuf grpcio scapy
 WORKDIR /libbpf
 ARG LIBBPF_VER=v0.7.0
 RUN git clone https://github.com/libbpf/libbpf.git --branch ${LIBBPF_VER} --single-branch && \
-    cd libbpf/src && \
-    PREFIX=/usr LIBDIR=/usr/lib UAPIDIR=/usr/include DESTDIR=/usr/bin/ make install && \
-    PREFIX=/usr LIBDIR=/usr/lib UAPIDIR=/usr/include DESTDIR=/usr/bin/ make install_uapi_headers && \
+    cd libbpf/src && make install && make install_uapi_headers && \
     ldconfig
 
 WORKDIR /bpftool
@@ -176,9 +174,7 @@ RUN ./install_mlx_ofed.sh
 WORKDIR /libbpf
 ARG LIBBPF_VER=v1.5.0
 RUN git clone https://github.com/libbpf/libbpf.git --branch ${LIBBPF_VER} --single-branch && \
-    cd libbpf/src && \
-    PREFIX=/usr LIBDIR=/usr/lib UAPIDIR=/usr/include DESTDIR=/usr/bin/ make install && \
-    PREFIX=/usr LIBDIR=/usr/lib UAPIDIR=/usr/include DESTDIR=/usr/bin/ make install_uapi_headers && \
+    cd libbpf/src && make install && make install_uapi_headers && \
     ldconfig
 
 WORKDIR /bpftool
