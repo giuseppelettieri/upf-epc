@@ -31,7 +31,7 @@ ebpf_cores=1
 # Gateway interface(s)
 #
 # In the order of ("s1u/n3" "sgi/n6")
-ifaces=("ens803f2" "ens803f3")
+ifaces=("ens4f0" "ens4f1")
 
 # Static IP addresses of gateway interface(s) in cidr format
 #
@@ -41,7 +41,7 @@ ipaddrs=(198.18.0.1/30 198.19.0.1/30)
 # MAC addresses of gateway interface(s)
 #
 # In the order of (s1u/n3 sgi/n6)
-macaddrs=(9e:b2:d3:34:ab:27 c2:9c:55:d4:8a:f6)
+macaddrs=(f8:f2:1e:b2:43:00 f8:f2:1e:b2:43:01)
 
 # Static IP addresses of the neighbors of gateway interface(s)
 #
@@ -51,7 +51,7 @@ nhipaddrs=(198.18.0.2 198.19.0.2)
 # Static MAC addresses of the neighbors of gateway interface(s)
 #
 # In the order of (n-s1u/n3 n-sgi/n6)
-nhmacaddrs=(22:53:7a:15:58:50 22:53:7a:15:58:50)
+nhmacaddrs=(f8:f2:1e:b2:65:70 f8:f2:1e:b2:65:71)
 
 # IPv4 route table entries in cidr format per port
 #
@@ -242,7 +242,7 @@ if [ "$mode" == 'cndp' ]; then
 fi
 
 # Run bessd
-docker run --name bess -td --restart unless-stopped \
+docker run --privileged -it --name bess -td --restart unless-stopped \
 	--cpuset-cpus=0-3 \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
 	-v "$PWD/conf":/opt/bess/bessctl/conf \

@@ -74,7 +74,7 @@
     // N3 interface
     "access": {
         // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
-        "ifname": "ens803f2"
+        "ifname": "ens4f0"
     },
 
     // N6 or N9 interface (depending on the UPF's deployment [PSA-UPF or I-UPF])
@@ -82,7 +82,7 @@
         // "cndp_jsonc_file": "conf/cndp_upf_1worker.jsonc",
         // Uncomment line below to enable UE IP natting. It could be a single IP or multiple IPs
         // "ip_masquerade": "18.0.0.1 or 18.0.0.2 or 18.0.0.3",
-        "ifname": "ens803f3"
+        "ifname": "ens4f1"
     },
 
     // Number of worker threads. Default: 1
