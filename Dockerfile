@@ -113,6 +113,7 @@ RUN mkdir -p plugins && \
 RUN sleep 1
 COPY /test/vport.cc /bess/core/drivers
 COPY /test/Makefile /bess/core
+COPY /test/sn_netdev.c /bess/core/kmod
 COPY upf-ebpf upf-ebpf
 COPY upf-ebpf/protobuf/upf_ebpf_msg.proto /protobuf/
 RUN mv upf-ebpf plugins/upf-ebpf
@@ -129,22 +130,42 @@ RUN ./install_ntf.sh
 
 ENV PLUGINS_DIR=plugins
 
-RUN ./plugins/upf-ebpf/scripts/install-deps.sh
+RUN ./plugins/upf-ebpf/scripts/install-deps.sh && sleep 1
 RUN cp -r plugins/upf-ebpf /bess
-
+RUN cp -r plugins/sample_plugin /bess
 RUN ./build.py --plugin upf-ebpf && \
 cp bin/bessd /bin && \
-mkdir -p /bin/modules && \
 cp -r core/modules/ /bin/modules && \
 mkdir -p /opt/bess && \
 cp -r bessctl pybess /opt/bess && \
 cp -r core/pb /pb 
 
-
-RUN ./build.py show-plugins && sleep 11
-
+#Bisogna aggiustare il makefile perchè il upf_ebpf main viene compilato come .so
+RUN ./build.py --help && sleep 12
+#RUN cd /bess/core/kmod && ls -al && sleep 1
+#RUN rm /bess/core/kmod/sn_netdev.c && sleep 1
+#COPY /test/sn_netdev.c /bess/core/kmod/
 RUN mkdir -p /opt/bess/bessctl/kmod
 RUN cp -r /bess/core/kmod/* /opt/bess/bessctl/kmod
+# RUN cd ../usr/bin/ && rm kmod && mkdir kmod && sleep 1
+#RUN ./build.py kmod
+#RUN rm /usr/bin/kmod
+#RUN mkdir -p /usr/bin/kmod
+#RUN cp /bess/core/kmod/bess.ko /usr/bin/kmod
+#RUN cd core/kmod/ && file bess.ko
+#RUN ls core/kmod/ && sleep 10
+#RUN find . "bess.ko" && sleep 10
+# RUN cp core/kmod/bess.ko /usr/bin/kmod
+# RUN ls ../usr/bin/kmod && sleep 10
+# RUN cd ../usr/bin/kmod && ls -al && sleep 5
+#RUN cd /usr/bin/kmod && ls -al && sleep 10
+#sistemare la dipendenza di kmod che si trova in /usr/bin/kmod
+#che viene chiamato da insmod che poi kmod cerca bess.ko 
+#in /usr/bin/kmod/ 
+#RUN ls -l /sbin/insmod && sleep 20
+RUN uname -r && \
+cat /boot/config-$(uname -r) | grep CONFIG_BPF && sleep 5 && \
+cat /boot/config-$(uname -r) | grep CONFIG_XDP_SOCKETS && sleep 5
 
 RUN rm -rf /var/lib/apt/lists/* && \
     apt-get --purge remove -y \
