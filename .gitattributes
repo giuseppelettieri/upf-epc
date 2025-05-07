@@ -3,4 +3,3 @@
 *       text    eol=lf
 *.bess  text    diff=python
 *.jpg   binary
-*.pcap filter=lfs diff=lfs merge=lfs -text
