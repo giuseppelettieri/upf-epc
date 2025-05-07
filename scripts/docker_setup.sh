@@ -24,7 +24,7 @@ pfcp_port=8805
 #mode="af_xdp"
 #mode="af_packet"
 # mode="sim"
-mode="xdp"
+mode="af_xdp"
 # mode="af_xdp_ebpf"
 ebpf_cores=1
 

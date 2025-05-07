@@ -9,7 +9,7 @@
     // "dpdk" to enable DPDK mode,
     // "sim" to generate synthetic traffic from BESS's Source module,
     // "" when running with UP4
-    "mode": "af_xdp",
+    "mode": "af_packet",
 
     "table_sizes": {
         // Example sizes based on sim mode and 50K sessions. Customize as per your control plane

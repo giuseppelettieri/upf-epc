@@ -15,4 +15,3 @@ venv/
 /upf-ebpf/
 ptf/log/
 .vscode
-/test

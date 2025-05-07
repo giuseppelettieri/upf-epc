@@ -2,6 +2,16 @@
 # Copyright 2020-present Open Networking Foundation
 # Copyright 2019-present Intel Corporation
 
+# Before start the build create the necessary interfaces
+# for example like this:
+#     sudo ip link add link enp4s0f1 name ens4f0 type vlan id 2
+#     sudo ip link add link enp4s0f1 name ens4f1 type vlan id 3
+#     sudo ip link set ens4f0 up
+#     sudo ip link set ens4f1 up
+#     sudo ip addr add 198.18.0.1/30 dev ens4f0
+#     sudo ip addr add 198.19.0.1/30 dev ens4f1
+
+
 # Stage bess: creates the runtime image of BESS
 FROM ubuntu:24.04 AS bess
 ARG CPU=native
@@ -65,7 +75,7 @@ RUN ls
 WORKDIR /bess
 ARG BESS_COMMIT=seb
 RUN git clone https://github.com/DanieleDiBella99/bess.git --branch ${BESS_COMMIT} --single-branch . && \
-    cp -a protobuf /protobuf && sleep 1
+    cp -a protobuf /protobuf && sleep 2
 # Build DPDK
 RUN ./build.py dpdk
 
@@ -80,13 +90,11 @@ update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100 \
 --slave /usr/bin/llc llc /usr/bin/llc-12 && \
 update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-12 100
 
-RUN which clang && sleep 10
 RUN apt-get remove -y libabsl-dev gcc
-#RUN gcc --version && sleep 5
 RUN apt-get update && apt-get install -y gcc-10 g++-10
 RUN ln -sf /usr/bin/gcc-10 /usr/bin/gcc && \
     ln -sf /usr/bin/g++-10 /usr/bin/g++
-RUN gcc --version && sleep 5
+
 WORKDIR /grpc
 ARG GRPC_VER=v1.44.0
 RUN git clone https://github.com/grpc/grpc --branch ${GRPC_VER} --single-branch && \
@@ -105,19 +113,16 @@ RUN cd /grpc/grpc && mkdir -p cmake/build && cd cmake/build && \
 
 
 RUN apt remove --purge -y libbpf*
-#RUN ldconfig -p | grep libbpf && sleep 20
+
 WORKDIR /bess
 RUN mkdir -p plugins && \
     mv sample_plugin plugins
 
-RUN sleep 1
-COPY /test/vport.cc /bess/core/drivers
-COPY /test/Makefile /bess/core
-COPY /test/sn_netdev.c /bess/core/kmod
 COPY upf-ebpf upf-ebpf
 COPY upf-ebpf/protobuf/upf_ebpf_msg.proto /protobuf/
 RUN mv upf-ebpf plugins/upf-ebpf
 
+#Removed support to cndp
 RUN cd /bess/core/drivers && rm cndp.cc
 
 RUN apt-get update && apt-get install -y libcap-dev libcap2-dev libsystemd-dev libgflags-dev
@@ -140,45 +145,18 @@ mkdir -p /opt/bess && \
 cp -r bessctl pybess /opt/bess && \
 cp -r core/pb /pb 
 
-#Bisogna aggiustare il makefile perchè il upf_ebpf main viene compilato come .so
-RUN ./build.py --help && sleep 12
-#RUN cd /bess/core/kmod && ls -al && sleep 1
-#RUN rm /bess/core/kmod/sn_netdev.c && sleep 1
-#COPY /test/sn_netdev.c /bess/core/kmod/
+#This line should fix the missing bess.ko
 RUN mkdir -p /opt/bess/bessctl/kmod
 RUN cp -r /bess/core/kmod/* /opt/bess/bessctl/kmod
-# RUN cd ../usr/bin/ && rm kmod && mkdir kmod && sleep 1
-#RUN ./build.py kmod
-#RUN rm /usr/bin/kmod
-#RUN mkdir -p /usr/bin/kmod
-#RUN cp /bess/core/kmod/bess.ko /usr/bin/kmod
-#RUN cd core/kmod/ && file bess.ko
-#RUN ls core/kmod/ && sleep 10
-#RUN find . "bess.ko" && sleep 10
-# RUN cp core/kmod/bess.ko /usr/bin/kmod
-# RUN ls ../usr/bin/kmod && sleep 10
-# RUN cd ../usr/bin/kmod && ls -al && sleep 5
-#RUN cd /usr/bin/kmod && ls -al && sleep 10
-#sistemare la dipendenza di kmod che si trova in /usr/bin/kmod
-#che viene chiamato da insmod che poi kmod cerca bess.ko 
-#in /usr/bin/kmod/ 
-#RUN ls -l /sbin/insmod && sleep 20
-RUN uname -r && \
-cat /boot/config-$(uname -r) | grep CONFIG_BPF && sleep 5 && \
-cat /boot/config-$(uname -r) | grep CONFIG_XDP_SOCKETS && sleep 5
 
 RUN rm -rf /var/lib/apt/lists/* && \
     apt-get --purge remove -y \
         gcc
         
 COPY conf /opt/bess/bessctl/conf
-COPY upf-ebpf/bessctl_conf/upf-ebpf.bess /opt/bess/bessctl/conf/upf-ebpf.bess
-COPY upf-ebpf/bessctl_conf/upf-ebpf-af_xdp.bess /opt/bess/bessctl/conf/upf-ebpf-af_xdp.bess
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 #Added this line to fix the issue with GLIBC_2.38
 RUN ln -s /lib/x86_64-linux-gnu/libc.so.6 /lib/x86_64-linux-gnu/libc-2.38.so
-
-RUN ldd --version && sleep 6
 
 
 ENV PYTHONPATH="/opt/bess"
@@ -191,7 +169,6 @@ ARG CPU=native
 RUN apt-get update && apt-get install -y golang
 RUN go version && sleep 5
 RUN go install github.com/golang/protobuf/protoc-gen-go@latest
-RUN ldd --version && sleep 5
 
 FROM bess AS go-pb
 COPY --from=protoc-gen /go/bin/protoc-gen-go /bin
@@ -199,7 +176,6 @@ RUN mkdir /bess_pb && \
     protoc -I /usr/include -I /protobuf/ \
     /protobuf/*.proto /protobuf/ports/*.proto \
     --go_opt=paths=source_relative --go_out=plugins=grpc:/bess_pb
-RUN ldd --version && sleep 5
 
 FROM bess AS py-pb
 RUN pip install --no-cache-dir grpcio-tools==1.26
@@ -208,14 +184,12 @@ RUN mkdir /bess_pb && \
     /protobuf/*.proto /protobuf/ports/*.proto \
     --python_out=plugins=grpc:/bess_pb \
     --grpc_python_out=/bess_pb
-RUN ldd --version && sleep 5
 
 FROM ubuntu:24.04 AS pfcpiface-build
 
 RUN apt-get update && apt-get install -y golang
 RUN apt-get update && apt-get install -y --reinstall ca-certificates
 RUN update-ca-certificates
-RUN go version && sleep 5
 ARG GOFLAGS
 ENV GOINSECURE="*"
 WORKDIR /pfcpiface
@@ -228,7 +202,6 @@ RUN if echo "$GOFLAGS" | grep -Eq "-mod=vendor"; then go mod download; fi
 
 COPY . /pfcpiface
 RUN CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
-RUN ldd --version && sleep 5
 
 # Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
 FROM ubuntu:24.04 AS pfcpiface
