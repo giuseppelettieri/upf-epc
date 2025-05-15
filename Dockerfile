@@ -98,19 +98,20 @@ ARG GRPC_VER=v1.44.0
 RUN git clone https://github.com/grpc/grpc --branch ${GRPC_VER} --single-branch && \
     cd /grpc/grpc && git submodule update --init --recursive
 RUN cd /grpc/grpc && mkdir -p cmake/build && cd cmake/build && \
-    cmake ../.. -DgRPC_INSTALL=ON              \
-                -DCMAKE_BUILD_TYPE=Release     \
-                -DgRPC_ABSL_PROVIDER=module    \
-                -DgRPC_CARES_PROVIDER=module   \
-                -DgRPC_PROTOBUF_PROVIDER=module\
-                -DgRPC_RE2_PROVIDER=module     \
-                -DgRPC_SSL_PROVIDER=package    \
-                -DgRPC_ZLIB_PROVIDER=package   \
-                -DCMAKE_CXX_STANDARD=17 &&     \
-    make -j$(getconf _NPROCESSORS_ONLN) && sudo make install
+    cmake ../.. -DgRPC_INSTALL=ON               \
+                -DCMAKE_BUILD_TYPE=Release      \
+                -DgRPC_ABSL_PROVIDER=module     \
+                -DgRPC_CARES_PROVIDER=module    \
+                -DgRPC_PROTOBUF_PROVIDER=module \
+                -DgRPC_RE2_PROVIDER=module      \
+                -DgRPC_SSL_PROVIDER=package     \
+                -DgRPC_ZLIB_PROVIDER=package && \
+    make -j$(getconf _NPROCESSORS_ONLN) && make install
 
-
-RUN apt remove --purge -y libbpf*
+RUN cd /grpc/grpc/third_party/protobuf && \
+    git submodule update --init --recursive && \
+    ./autogen.sh && ./configure && \
+    make -j$(getconf _NPROCESSORS_ONLN) && make install && ldconfig
 
 WORKDIR /bess
 RUN mkdir -p plugins && \
