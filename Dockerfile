@@ -32,20 +32,22 @@ RUN apt-get update && apt-get install -y \
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install \
-        ca-certificates python3-pip software-properties-common \
-        libelf-dev sudo kmod python3-pyverbs curl python-is-python3 \
-        linux-tools-common linux-tools-generic linux-headers-generic\
+        ca-certificates software-properties-common \
+        sudo kmod python3-pyverbs curl python-is-python3 \
+        linux-tools-common linux-tools-generic linux-headers-`uname -r` build-essential \
         python3-pyverbs pkg-config git make apt-transport-https \
         g++ libunwind8-dev liblzma-dev zlib1g-dev \
-        libpcap-dev libssl-dev libnuma-dev git \
-        python3-scapy libgflags-dev libgoogle-glog-dev \
+        libpcap-dev libssl-dev libnuma-dev \
+        python3-protobuf python3-grpcio python3-scapy libgflags-dev libgoogle-glog-dev \
         libgraph-easy-perl libgtest-dev \
         libc-ares-dev libbenchmark-dev \
         libgtest-dev wget autoconf \
         automake cmake libtool \
-        make ninja-build patch python3-pip \
-        unzip virtualenv zip tar meson \
-        libelf-dev libz-dev libnl-3-dev clang llvm
+        make ninja-build patch \
+        unzip virtualenv zip tar meson-1.5 \
+        libz-dev libnl-3-dev gcc g++ gcc-multilib clang llvm lld m4 \
+        ethtool libbsd0 libbsd-dev libelf1 libelf-dev libjson-c-dev libnl-3-dev libnl-cli-3-dev libnuma-dev \
+        libpcap0.8 libcap-dev libsystemd-dev libgflags-dev
 
 RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/asm
 
