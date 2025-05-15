@@ -163,7 +163,14 @@ RUN ./plugins/upf-ebpf/scripts/install-deps.sh
 RUN cp -r plugins/upf-ebpf /bess
 RUN cp -r plugins/sample_plugin /bess
 
-RUN ./build.py --plugin upf-ebpf && \
+# FIX error from meson-private/install.dat
+RUN cd /bess/deps/dpdk-20.11.4/build && meson setup --reconfigure /bess/deps/dpdk-20.11.4
+# FIX too many arguments to function ‘netif_napi_add’
+RUN sed -e "176s/sn_poll, NAPI_POLL_WEIGHT/sn_poll/" -i /bess/core/kmod/sn_netdev.c
+# FIX implicit declaration of function ‘napi_reschedule’; did you mean ‘napi_schedule’?
+RUN sed -e "497s/napi_reschedule/napi_schedule/" -i /bess/core/kmod/sn_netdev.c
+
+RUN cd /bess && ./build.py --plugin upf-ebpf && \
 cp bin/bessd /bin && \
 mkdir -p /bin/modules && \
 cp -r core/modules/ /bin/modules && \
