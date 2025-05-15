@@ -63,24 +63,20 @@ RUN ./xdp-scripts/install-dependencies.sh && \
 
 WORKDIR /libxdp
 ARG LIBXDP_VER=libxdp-cpp-v1.5.0
-RUN git clone https://github.com/alefais/xdp-tools.git --branch ${LIBXDP_VER} --single-branch && \
-    cd xdp-tools && ./configure && make libxdp && \
-    sudo make libxdp install && sudo ldconfig
+RUN git clone --recurse-submodules https://github.com/alefais/xdp-tools.git --branch ${LIBXDP_VER} --single-branch && \
+    cd xdp-tools && FORCE_SUBDIR_LIBBPF=1 ./configure && make libxdp && \
+    PREFIX=/usr make libxdp install && ldconfig
+RUN echo -e "Linux libxdp installed." && pkg-config --modversion libxdp
 
-WORKDIR /libbpf0
+# linux ver should match target machine's kernel
+WORKDIR /libbpf
 ARG LIBBPF_VER=v0.7.0
 RUN git clone https://github.com/libbpf/libbpf.git --branch ${LIBBPF_VER} --single-branch && \
-    cd libbpf/src && DESTDIR=/usr/bin/ make install && make install_uapi_headers && \
+    cd libbpf/src && LIBDIR=/usr/lib/x86_64-linux-gnu/ make install && LIBDIR=/usr/lib/x86_64-linux-gnu/ make install_uapi_headers && \
+    # echo /usr/lib64 >> /etc/ld.so.conf.d/x86_64-linux-gnu.conf && \
     ldconfig
-
-# BESS pre-reqs
-WORKDIR /bess
-ARG BESS_COMMIT=seb
-RUN git clone https://github.com/DanieleDiBella99/bess.git --branch ${BESS_COMMIT} --single-branch . && \
-    cp -a protobuf /protobuf
-
-# Build DPDK
-RUN ./build.py dpdk
+RUN export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
+RUN echo -e "Linux libbpf installed." && pkg-config --modversion libbpf
 
 RUN apt-get remove --purge -y clang* llvm*
 
