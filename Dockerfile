@@ -60,9 +60,9 @@ RUN pip3 install --user protobuf grpcio scapy
 
 # linux ver should match target machine's kernel
 WORKDIR /libbpf
-ARG LIBBPF_VER=v0.7.0
+ARG LIBBPF_VER=v0.6.0
 RUN git clone https://github.com/libbpf/libbpf.git --branch ${LIBBPF_VER} --single-branch && \
-    cd libbpf/src && make install && make install_uapi_headers && \
+    cd libbpf/src && DESTDIR=/usr/bin/ make install && make install_uapi_headers && \
     ldconfig
 
 WORKDIR /bpftool
@@ -96,7 +96,7 @@ RUN apt-get update && apt-get install -y \
 # BESS pre-reqs
 WORKDIR /bess
 ARG BESS_COMMIT=seb
-RUN git clone https://github.com/giuseppelettieri/bess.git --branch ${BESS_COMMIT} --single-branch . && \
+RUN git clone https://github.com/DanieleDiBella99/bess.git --branch ${BESS_COMMIT} --single-branch . && \
     cp -a protobuf /protobuf
 
 # Build DPDK
@@ -220,12 +220,14 @@ RUN apt-get update && apt-get install -y \
     pkg-config && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
 COPY --from=bess-build /usr/bin/cndpfwd /usr/bin/
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.so /usr/local/lib/x86_64-linux-gnu/
 COPY --from=bess-build /usr/local/lib/x86_64-linux-gnu/*.a /usr/local/lib/x86_64-linux-gnu/
 COPY --from=bess-build /usr/lib/libxdp* /usr/lib/
 COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libjson-c.so* /lib/x86_64-linux-gnu/
 COPY --from=bess-build /usr/lib/x86_64-linux-gnu/libbpf.so* /usr/lib/x86_64-linux-gnu/
+COPY --from=bess-build /usr/lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/
 
 ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
