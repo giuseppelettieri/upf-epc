@@ -78,16 +78,15 @@ RUN git clone https://github.com/libbpf/libbpf.git --branch ${LIBBPF_VER} --sing
 RUN export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
 RUN echo -e "Linux libbpf installed." && pkg-config --modversion libbpf
 
-RUN apt-get remove --purge -y clang* llvm*
-
+# Setup llvm and clang version to the older release 12.0.0
 RUN wget http://archive.ubuntu.com/ubuntu/pool/main/libf/libffi/libffi7_3.3-4_amd64.deb && dpkg -i libffi7_3.3-4_amd64.deb
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add - && \
-add-apt-repository -y "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-12 main" && \
-apt-get update && apt-get install -y clang-12 clang-tools-12 clang-format-12 llvm-12 llvm-12-dev llvm-12-tools llvm-12-runtime && \
-update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100 \
---slave /usr/bin/clang++ clang++ /usr/bin/clang++-12 \
---slave /usr/bin/llc llc /usr/bin/llc-12 && \
-update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-12 100
+    add-apt-repository -y "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-12 main" && \
+    apt-get update && apt-get install -y clang-12 clang-tools-12 clang-format-12 llvm-12 llvm-12-dev llvm-12-tools llvm-12-runtime && \
+    update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100 \
+    --slave /usr/bin/clang++ clang++ /usr/bin/clang++-12 \
+    --slave /usr/bin/llc llc /usr/bin/llc-12 && \
+    update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-12 100
 
 RUN apt-get remove -y libabsl-dev gcc
 RUN apt-get update && apt-get install -y gcc-10 g++-10
