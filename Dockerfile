@@ -113,6 +113,9 @@ RUN cd /grpc/grpc/third_party/protobuf && \
     ./autogen.sh && ./configure && \
     make -j$(getconf _NPROCESSORS_ONLN) && make install && ldconfig
 
+# Restore gcc and g++ version 13.3.0 (default on Ubuntu 24.04)
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 150 \
+    --slave /usr/bin/g++ g++ /usr/bin/g++-13
 WORKDIR /bess
 RUN mkdir -p plugins && \
     mv sample_plugin plugins
