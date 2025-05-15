@@ -88,10 +88,10 @@ RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add - && \
     --slave /usr/bin/llc llc /usr/bin/llc-12 && \
     update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-12 100
 
-RUN apt-get remove -y libabsl-dev gcc
+# Setup gcc and g++ version to the older release 10.5.0
 RUN apt-get update && apt-get install -y gcc-10 g++-10
-RUN ln -sf /usr/bin/gcc-10 /usr/bin/gcc && \
-    ln -sf /usr/bin/g++-10 /usr/bin/g++
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100 \
+    --slave /usr/bin/g++ g++ /usr/bin/g++-10
 
 WORKDIR /grpc
 ARG GRPC_VER=v1.44.0
