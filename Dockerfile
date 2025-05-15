@@ -14,6 +14,8 @@
 # Stage bess: creates the runtime image of BESS
 FROM ubuntu:24.04 AS bess
 ARG CPU=native
+ENV PLUGINS_DIR=plugins
+
 WORKDIR /
 COPY requirements.txt .
 RUN apt-get update && apt-get install -y \
@@ -130,8 +132,6 @@ ARG ENABLE_NTF
 ARG NTF_COMMIT=master
 COPY scripts/install_ntf.sh .
 RUN ./install_ntf.sh
-
-ENV PLUGINS_DIR=plugins
 
 RUN ./plugins/upf-ebpf/scripts/install-deps.sh
 RUN cp -r plugins/upf-ebpf /bess
