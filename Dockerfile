@@ -116,6 +116,35 @@ RUN cd /grpc/grpc/third_party/protobuf && \
 # Restore gcc and g++ version 13.3.0 (default on Ubuntu 24.04)
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 150 \
     --slave /usr/bin/g++ g++ /usr/bin/g++-13
+
+# BESS pre-reqs
+
+# Build and install CNDP shared libraries + Build and install CNDP static libraries
+WORKDIR /cndp
+RUN git clone https://github.com/CloudNativeDataPlane/cndp.git && \
+    cd cndp && \
+    sed -e "155s#.*#add_project_arguments('-I/cndp/lib/include/', language: 'c')#" -i meson.build && \
+    make && make install && make static_build=1 rebuild install && \
+    cp -r usr/local/include/cndp/* /usr/local/include && \
+    cp -r usr/local/lib/* /usr/local/lib && \
+    cp -r usr/local/bin/* /usr/local/bin
+
+# Set CNDP PKG_CONFIG_PATH
+ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig
+
+WORKDIR /python-iptools
+RUN git clone https://github.com/bd808/python-iptools.git && \
+    cd python-iptools && python setup.py install
+
+WORKDIR /bess
+ARG BESS_COMMIT=seb
+RUN git clone https://github.com/DanieleDiBella99/bess.git --branch ${BESS_COMMIT} --single-branch . && \
+    sed -e "74s/$/ libcndp/" -i core/Makefile && \
+    cp -a protobuf /protobuf
+
+# Build DPDK
+RUN ./build.py dpdk
+
 WORKDIR /bess
 RUN mkdir -p plugins && \
     mv sample_plugin plugins
@@ -123,10 +152,6 @@ RUN mkdir -p plugins && \
 COPY upf-ebpf upf-ebpf
 COPY upf-ebpf/protobuf/upf_ebpf_msg.proto /protobuf/
 RUN mv upf-ebpf plugins/upf-ebpf
-
-RUN cd /bess/core/drivers && rm cndp.cc
-
-RUN apt-get update && apt-get install -y libcap-dev libcap2-dev libsystemd-dev libgflags-dev
 
 ## Network Token
 ARG ENABLE_NTF
