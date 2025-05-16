@@ -48,7 +48,7 @@ type Conf struct {
 	RespTimeout              string           `json:"resp_timeout"`
 	EnableHBTimer            bool             `json:"enable_hbTimer"`
 	HeartBeatInterval        string           `json:"heart_beat_interval"`
-	EnableBPFFastPath bool             `json:"enable_ebpf_fp"`
+	EnableBPFFastPath        bool             `json:"enable_ebpf_fp"`
 	N4Addr                   string           `json:"n4_addr"`
 }
 
