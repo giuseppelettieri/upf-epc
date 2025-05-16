@@ -20,12 +20,13 @@ pfcp_port=8805
 # "sim" uses Source() modules to simulate traffic generation
 # "cndp" uses kernel AF-XDP. It supports ZC and XDP offload if driver and NIC supports it. It's tested on Intel 800 series n/w adapter.
 # mode="dpdk"
-#mode="cndp"
-#mode="af_xdp"
-#mode="af_packet"
+# mode="cndp"
+# mode="af_xdp"
+# mode="af_packet"
 # mode="sim"
-mode="xdp"
+# mode="xdp"
 # mode="af_xdp_ebpf"
+mode="xdp"
 ebpf_cores=1
 
 # Gateway interface(s)
