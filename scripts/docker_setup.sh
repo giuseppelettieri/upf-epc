@@ -32,7 +32,7 @@ ebpf_cores=1
 # Gateway interface(s)
 #
 # In the order of ("s1u/n3" "sgi/n6")
-ifaces=("ens803f2" "ens803f3")
+ifaces=("ix0" "ix1")
 
 # Static IP addresses of gateway interface(s) in cidr format
 #
@@ -42,7 +42,7 @@ ipaddrs=(198.18.0.1/30 198.19.0.1/30)
 # MAC addresses of gateway interface(s)
 #
 # In the order of (s1u/n3 sgi/n6)
-macaddrs=(9e:b2:d3:34:ab:27 c2:9c:55:d4:8a:f6)
+macaddrs=(90:e2:ba:04:f2:54 90:e2:ba:04:f2:55)
 
 # Static IP addresses of the neighbors of gateway interface(s)
 #
