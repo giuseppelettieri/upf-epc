@@ -64,19 +64,21 @@ RUN ./xdp-scripts/install-dependencies.sh && \
 WORKDIR /libxdp
 ARG LIBXDP_VER=libxdp-cpp-v1.5.0
 RUN git clone --recurse-submodules https://github.com/alefais/xdp-tools.git --branch ${LIBXDP_VER} --single-branch && \
-    cd xdp-tools && FORCE_SUBDIR_LIBBPF=1 ./configure && make libxdp && \
-    PREFIX=/usr make libxdp install && ldconfig
-RUN echo -e "Linux libxdp installed." && pkg-config --modversion libxdp
+    cd xdp-tools && \
+    FORCE_SUBDIR_LIBBPF=1 ./configure && \
+    make libxdp && PREFIX=/usr make libxdp install && \
+    ldconfig && \
+    echo -e "Linux libxdp installed." && pkg-config --modversion libxdp
 
 # linux ver should match target machine's kernel
 WORKDIR /libbpf
 ARG LIBBPF_VER=v0.7.0
 RUN git clone https://github.com/libbpf/libbpf.git --branch ${LIBBPF_VER} --single-branch && \
-    cd libbpf/src && LIBDIR=/usr/lib/x86_64-linux-gnu/ make install && LIBDIR=/usr/lib/x86_64-linux-gnu/ make install_uapi_headers && \
-    # echo /usr/lib64 >> /etc/ld.so.conf.d/x86_64-linux-gnu.conf && \
-    ldconfig
-RUN export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
-RUN echo -e "Linux libbpf installed." && pkg-config --modversion libbpf
+    cd libbpf/src && \
+    LIBDIR=/usr/lib/x86_64-linux-gnu/ make install && LIBDIR=/usr/lib/x86_64-linux-gnu/ make install_uapi_headers && \
+    ldconfig && \
+    export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig && \
+    echo -e "Linux libbpf installed." && pkg-config --modversion libbpf
 
 # Setup llvm and clang version to the older release 12.0.0
 RUN wget http://archive.ubuntu.com/ubuntu/pool/main/libf/libffi/libffi7_3.3-4_amd64.deb && dpkg -i libffi7_3.3-4_amd64.deb
@@ -96,8 +98,8 @@ RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100 \
 WORKDIR /grpc
 ARG GRPC_VER=v1.44.0
 RUN git clone https://github.com/grpc/grpc --branch ${GRPC_VER} --single-branch && \
-    cd /grpc/grpc && git submodule update --init --recursive
-RUN cd /grpc/grpc && mkdir -p cmake/build && cd cmake/build && \
+    cd /grpc/grpc && git submodule update --init --recursive && \
+    mkdir -p cmake/build && cd cmake/build && \
     cmake ../.. -DgRPC_INSTALL=ON               \
                 -DCMAKE_BUILD_TYPE=Release      \
                 -DgRPC_ABSL_PROVIDER=module     \
@@ -159,9 +161,11 @@ ARG NTF_COMMIT=master
 COPY scripts/install_ntf.sh .
 RUN ./install_ntf.sh
 
-RUN ./plugins/upf-ebpf/scripts/install-deps.sh
-RUN cp -r plugins/upf-ebpf /bess
-RUN cp -r plugins/sample_plugin /bess
+RUN ./plugins/upf-ebpf/scripts/install-deps.sh && \
+    cp -r plugins/upf-ebpf /bess && \
+    cp -r plugins/sample_plugin /bess && \
+    echo -e "Check Linux libxdp version: expected v1.5.0." && pkg-config --modversion libxdp && \
+    echo -e "Check Linux libbpf version: expected v0.7.0." && pkg-config --modversion libbpf
 
 # FIX error from meson-private/install.dat
 RUN cd /bess/deps/dpdk-20.11.4/build && meson setup --reconfigure /bess/deps/dpdk-20.11.4
@@ -171,25 +175,24 @@ RUN sed -e "176s/sn_poll, NAPI_POLL_WEIGHT/sn_poll/" -i /bess/core/kmod/sn_netde
 RUN sed -e "497s/napi_reschedule/napi_schedule/" -i /bess/core/kmod/sn_netdev.c
 
 RUN cd /bess && ./build.py --plugin upf-ebpf && \
-cp bin/bessd /bin && \
-mkdir -p /bin/modules && \
-cp -r core/modules/ /bin/modules && \
-mkdir -p /opt/bess && \
-cp -r bessctl pybess /opt/bess && \
-cp -r core/pb /pb
-
-RUN mkdir -p /opt/bess/bessctl/kmod
-RUN cp -r /bess/core/kmod/* /opt/bess/bessctl/kmod
+    mkdir -p /bin/modules && \
+    mkdir -p /opt/bess && \
+    mkdir -p /pb && \
+    cp bin/bessd /bin && \
+    cp -r core/modules/ /bin/modules && \
+    cp -r bessctl pybess /opt/bess && \
+    cp -r core/pb /pb && \
+    mkdir -p /opt/bess/bessctl/kmod && \
+    cp -r /bess/core/kmod/* /opt/bess/bessctl/kmod
 
 RUN rm -rf /var/lib/apt/lists/* && \
-    apt-get --purge remove -y \
-    gcc
+    apt-get --purge remove -y gcc
 
 COPY conf /opt/bess/bessctl/conf
 RUN cp -r /bess/upf-ebpf /opt/bess/bessctl
-RUN ln -s /opt/bess/bessctl/bessctl /bin
-#Added this line to fix the issue with GLIBC_2.38
-RUN ln -s /lib/x86_64-linux-gnu/libc.so.6 /lib/x86_64-linux-gnu/libc-2.38.so
+# FIX problem related to glibc-2.38 not found
+RUN ln -s /opt/bess/bessctl/bessctl /bin && \
+    ln -s /lib/x86_64-linux-gnu/libc.so.6 /lib/x86_64-linux-gnu/libc-2.38.so
 
 ENV PYTHONPATH="/opt/bess"
 WORKDIR /opt/bess/bessctl
@@ -199,7 +202,6 @@ ENTRYPOINT ["bessd", "-f"]
 FROM ubuntu:24.04 AS protoc-gen
 ARG CPU=native
 RUN apt-get update && apt-get install -y golang
-RUN go version
 RUN go install github.com/golang/protobuf/protoc-gen-go@latest
 
 FROM bess AS go-pb
@@ -219,8 +221,8 @@ RUN mkdir /bess_pb && \
 
 FROM ubuntu:24.04 AS pfcpiface-build
 RUN apt-get update && apt-get install -y golang
-RUN apt-get update && apt-get install -y --reinstall ca-certificates
-RUN update-ca-certificates
+RUN apt-get update && apt-get install -y --reinstall ca-certificates && \
+    update-ca-certificates
 ARG GOFLAGS
 ENV GOINSECURE="*"
 WORKDIR /pfcpiface
