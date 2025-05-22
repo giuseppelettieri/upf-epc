@@ -243,7 +243,7 @@ if [ "$mode" == 'cndp' ]; then
 fi
 
 # Run bessd
-docker run --name bess -td --restart unless-stopped \
+docker run --privileged --name bess -td --restart unless-stopped \
 	--cpuset-cpus=1,3,5,7,9,11,13,15 \
 	--ulimit memlock=-1 -v /dev/hugepages:/dev/hugepages \
 	-v "$PWD/conf":/opt/bess/bessctl/conf \
