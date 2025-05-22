@@ -186,6 +186,7 @@ RUN rm -rf /var/lib/apt/lists/* && \
     gcc
 
 COPY conf /opt/bess/bessctl/conf
+RUN cp -r /bess/upf-ebpf /opt/bess/bessctl
 RUN ln -s /opt/bess/bessctl/bessctl /bin
 #Added this line to fix the issue with GLIBC_2.38
 RUN ln -s /lib/x86_64-linux-gnu/libc.so.6 /lib/x86_64-linux-gnu/libc-2.38.so
@@ -236,6 +237,7 @@ RUN CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
 # Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
 FROM ubuntu:24.04 AS pfcpiface
 COPY conf /opt/bess/bessctl/conf
+COPY --from=bess /bess/upf-ebpf /opt/bess/bessctl
 COPY --from=pfcpiface-build /bin/pfcpiface /bin
 ENTRYPOINT [ "/bin/pfcpiface" ]
 
