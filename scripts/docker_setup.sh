@@ -52,7 +52,7 @@ nhipaddrs=(198.18.0.2 198.19.0.2)
 # Static MAC addresses of the neighbors of gateway interface(s)
 #
 # In the order of (n-s1u/n3 n-sgi/n6)
-nhmacaddrs=(22:53:7a:15:58:50 22:53:7a:15:58:50)
+nhmacaddrs=(00:1b:21:d5:79:04 00:1b:21:d5:79:04)
 
 # IPv4 route table entries in cidr format per port
 #
