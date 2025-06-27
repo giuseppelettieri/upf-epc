@@ -179,9 +179,9 @@ RUN cd /bess && ./build.py --plugin upf-ebpf && \
     mkdir -p /opt/bess && \
     mkdir -p /pb && \
     cp bin/bessd /bin && \
-    cp -r core/modules/ /bin/modules && \
+    cp -r core/modules/* /bin/modules && \
     cp -r bessctl pybess /opt/bess && \
-    cp -r core/pb /pb && \
+    cp -r core/pb/* /pb && \
     mkdir -p /opt/bess/bessctl/kmod && \
     cp -r /bess/core/kmod/* /opt/bess/bessctl/kmod
 
