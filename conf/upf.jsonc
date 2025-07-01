@@ -109,7 +109,7 @@
     // "endmarker_sockaddr": "/tmp/pfcpport",
 
     // Whether to enable eBPF/XDP Fast Path
-    "enable_ebpf_fp": true,
+    "enable_ebpf_fp": false,
 
     // Whether to enable UPF HeartBeatTimer feature
     "enable_hbTimer": false,
