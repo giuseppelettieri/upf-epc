@@ -16,9 +16,10 @@ flows = 5000
 workers=[3, 5, 7, 9]
 gtppsc = False
 qfi = 9
-smac = "f8:f2:1e:b2:65:70"
-dmac_access = "f8:f2:1e:b2:43:00"
-dmac_core = "f8:f2:1e:b2:43:01"
+
+smac = "00:1b:21:d5:79:04"
+dmac_access = "90:e2:ba:04:f2:54"
+dmac_core = "90:e2:ba:04:f2:54"
 
 if gtppsc:
     # flow create 0 ingress pattern eth / ipv4 / udp / gtpu / gtp_psc / ipv4 / end actions rss types ipv4 l3-src-only end key_len 0 queues end / end
@@ -59,11 +60,11 @@ n3seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", n3seq_offset, 0x30
 n9seq_kwargs = sim.gen_gtpu_sequpdate_args(flows, "16.0.0.1", n9seq_offset, 0x90000000)
 n6seq_kwargs = sim.gen_inet_sequpdate_args(flows, "16.0.0.1")
 
-# 25 Gbps each to saturate 100 Gbps
-bess.add_tc('39_limit', wid=0, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
-bess.add_tc('36_limit', wid=0, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
-bess.add_tc('6_limit',  wid=1, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
-bess.add_tc('9_limit',  wid=1, policy='rate_limit', resource='bit', limit={'bit': 25000000000})
+# 250 Mbps each to saturate 1 Gbps (for testing and debug purposes)
+bess.add_tc('39_limit', wid=0, policy='rate_limit', resource='bit', limit={'bit': 250000000})
+bess.add_tc('36_limit', wid=0, policy='rate_limit', resource='bit', limit={'bit': 250000000})
+bess.add_tc('6_limit',  wid=1, policy='rate_limit', resource='bit', limit={'bit': 250000000})
+bess.add_tc('9_limit',  wid=1, policy='rate_limit', resource='bit', limit={'bit': 250000000})
 
 src39::Source(pkt_size=pkt_size) -> Rewrite(templates=n39_pkts) -> n39update::SequentialUpdate(**n3seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=0)
 src36::Source(pkt_size=pkt_size) -> Rewrite(templates=n36_pkts) -> n36update::SequentialUpdate(**n3seq_kwargs) -> L4Checksum() -> IPChecksum() -> QueueOut(port=p.name, qid=1)
