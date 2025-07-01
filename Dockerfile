@@ -149,7 +149,7 @@ RUN ./build.py dpdk
 
 WORKDIR /bess
 RUN mkdir -p plugins && \
-    mv sample_plugin plugins
+    mv sample_plugin plugins/sample_plugin
 
 COPY upf-ebpf upf-ebpf
 COPY upf-ebpf/protobuf/upf_ebpf_msg.proto /protobuf/
@@ -174,7 +174,9 @@ RUN sed -e "176s/sn_poll, NAPI_POLL_WEIGHT/sn_poll/" -i /bess/core/kmod/sn_netde
 # FIX implicit declaration of function ‘napi_reschedule’; did you mean ‘napi_schedule’?
 RUN sed -e "497s/napi_reschedule/napi_schedule/" -i /bess/core/kmod/sn_netdev.c
 
-RUN cd /bess && ./build.py --plugin upf-ebpf && \
+RUN cd /bess && \
+    ./build.py --plugin sample_plugin && \
+    ./build.py --plugin upf-ebpf && \
     mkdir -p /bin/modules && \
     mkdir -p /opt/bess && \
     mkdir -p /pb && \
@@ -189,7 +191,8 @@ RUN rm -rf /var/lib/apt/lists/* && \
     apt-get --purge remove -y gcc
 
 COPY conf /opt/bess/bessctl/conf
-RUN cp -r /bess/upf-ebpf /opt/bess/bessctl
+RUN cp -r /bess/sample_plugin /opt/bess/bessctl && \
+    cp -r /bess/upf-ebpf /opt/bess/bessctl
 # FIX problem related to glibc-2.38 not found
 RUN ln -s /opt/bess/bessctl/bessctl /bin && \
     ln -s /lib/x86_64-linux-gnu/libc.so.6 /lib/x86_64-linux-gnu/libc-2.38.so
@@ -239,6 +242,7 @@ RUN CGO_ENABLED=0 go build $GOFLAGS -o /bin/pfcpiface ./cmd/pfcpiface
 # Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C
 FROM ubuntu:24.04 AS pfcpiface
 COPY conf /opt/bess/bessctl/conf
+COPY --from=bess /bess/sample_plugin /opt/bess/bessctl
 COPY --from=bess /bess/upf-ebpf /opt/bess/bessctl
 COPY --from=pfcpiface-build /bin/pfcpiface /bin
 ENTRYPOINT [ "/bin/pfcpiface" ]
